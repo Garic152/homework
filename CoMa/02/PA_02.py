@@ -12,15 +12,27 @@ def convert_to_standart(P, Q):
 
 
 def intersects(P, Q, T):
-    pass
+    return Q[0] >= 0 and P[0] <= T[0] and Q[1] >= 0 and P[1] <= T[1]
 
 
 def get_delta_x1(p1, q1, t1):
-    pass
+    count = 0
+
+    for i in range(min(p1, q1), max(p1, q1)):
+        if i >= 0 and i < t1:
+            count += 1
+
+    return count
 
 
 def get_delta_x2(p2, q2, t2):
-    pass
+    count = 0
+
+    for i in range(min(p2, q2), max(p2, q2)):
+        if i >= 0 and i < t2:
+            count += 1
+
+    return count
 
 
 def get_lattice_point_number(P, Q, T):
@@ -45,18 +57,21 @@ def get_lattice_point_number(P, Q, T):
 
 
 # example
-P = (-6, -4)
-Q = (2, 1)
-T = (6, 5)
+# P = (-6, -4)
+# Q = (2, 1)
+# T = (6, 5)
 
-answer = get_lattice_point_number(P, Q, T)
-print(answer + "\n")
+# answer = get_lattice_point_number(P, Q, T)
+# print(answer + "\n")
 
-P = (3, 5)
-Q = (-3, 7)
-T = (6, 5)
+# P = (3, 5)
+# Q = (-3, 7)
+# T = (6, 5)
 
-P, Q = convert_to_standart(P, Q)
-print(P, Q)
+# P, Q = convert_to_standart(P, Q)
+# print(P, Q)
 
-print(intersects(P, Q, T))
+# print(intersects(P, Q, T))
+
+# print(get_delta_x1(P[0], Q[0], T[0]))
+# print(get_delta_x2(P[1], Q[1], T[1]))
