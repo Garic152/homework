@@ -1,4 +1,4 @@
-def convert_to_standart(P, Q):
+def convert_to_standard(P, Q):
     lower_left_x = min(P[0], Q[0])
     lower_left_y = min(P[1], Q[1])
 
@@ -49,29 +49,23 @@ def get_lattice_point_number(P, Q, T):
                 lattice_points += 1
 
     if lattice_points > 0:
-        return ("Die Anzahl der Gitterpunkte im Rechteck betraegt " + str(lattice_points) + ".")
+        return ("Die Anzahl der Gitterpunkte im Rechteck betraegt {}.".format(lattice_points))
     elif lattice_points == 0:
         return ("Der Schnitt der gegebenen Rechtecke ist leer.")
     else:
         print("Invalid lattice_point number: " + str(lattice_points))
 
 
-# example
-# P = (-6, -4)
-# Q = (2, 1)
-# T = (6, 5)
+# example1
+P = (2, -1)
+Q = (5, 8)
+T = (6, 4)
 
-# answer = get_lattice_point_number(P, Q, T)
-# print(answer + "\n")
+print(get_lattice_point_number(P, Q, T))
+P, Q = convert_to_standard(P, Q)
+print(P, Q)
 
-# P = (3, 5)
-# Q = (-3, 7)
-# T = (6, 5)
+print(intersects(P, Q, T))
 
-# P, Q = convert_to_standart(P, Q)
-# print(P, Q)
-
-# print(intersects(P, Q, T))
-
-# print(get_delta_x1(P[0], Q[0], T[0]))
-# print(get_delta_x2(P[1], Q[1], T[1]))
+print(get_delta_x1(P[0], Q[0], T[0]))
+print(get_delta_x2(P[1], Q[1], T[1]))
