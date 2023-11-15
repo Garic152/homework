@@ -37,7 +37,7 @@ def get_delta_x2(p2, q2, t2):
 
 def get_lattice_point_number(P, Q, T):
     if T[0] < 0 or T[1] < 0:
-        return ("Die Eingabe ist fehlerhaft.")
+        return "Die Eingabe ist fehlerhaft."
 
     lower_left_x = max(0, min(P[0], Q[0]))
     lower_left_y = max(0, min(P[1], Q[1]))
@@ -47,13 +47,16 @@ def get_lattice_point_number(P, Q, T):
     width = upper_right_x - lower_left_x + 1
     height = upper_right_y - lower_left_y + 1
 
-    return ("Die Anzahl der Gitterpunkte im Rechteck betraegt {}.".format(width * height))
+    if width * height == 0:
+        return "Der Schnitt der gegebenen Rechtecke ist leer."
+
+    return "Die Anzahl der Gitterpunkte im Rechteck betraegt {}.".format(int(width * height))
 
 
 # example1
-P = (-6, -4)
-Q = (2, 1)
-T = (6, 5)
+P = (2, -1)
+Q = (5, 8)
+T = (6, 4)
 
 print(get_lattice_point_number(P, Q, T))
 P, Q = convert_to_standard(P, Q)
