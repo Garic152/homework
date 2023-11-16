@@ -1,34 +1,34 @@
+#include <arpa/inet.h>
+#include <errno.h>
+#include <netdb.h>
+#include <netinet/in.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
-#include <errno.h>
 #include <string.h>
-#include <sys/types.h>
 #include <sys/socket.h>
-#include <netdb.h>
-#include <arpa/inet.h>
+#include <sys/types.h>
 #include <sys/wait.h>
-#include <signal.h>
-#include <netinet/in.h>
+#include <unistd.h>
 
 #define MYPORT "1234"
 #define BACKLOG 10
 
 void sigchld_handler(int s) {
   int saved_errno = errno;
-  
-  while(waitpid(-1, NULL, WNOHANG) < 0);
-  
+
+  while (waitpid(-1, NULL, WNOHANG) < 0)
+    ;
+
   errno = saved_errno;
 }
 
-void *get_in_addr(struct sockaddr *sa)
-{
-    if (sa->sa_family == AF_INET) {
-        return &(((struct sockaddr_in*)sa)->sin_addr);
-    }
+void *get_in_addr(struct sockaddr *sa) {
+  if (sa->sa_family == AF_INET) {
+    return &(((struct sockaddr_in *)sa)->sin_addr);
+  }
 
-    return &(((struct sockaddr_in6*)sa)->sin6_addr);
+  return &(((struct sockaddr_in6 *)sa)->sin6_addr);
 }
 
 int main(int argc, char *argv[]) {
@@ -36,7 +36,7 @@ int main(int argc, char *argv[]) {
     fprintf(stderr, "Usage: %s <ip> <port>\n", argv[0]);
     return 1;
   }
-  
+
   const char *ip = argv[1];
   const char *port = argv[2];
 
@@ -60,7 +60,7 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
-  for(p = servinfo; p != NULL; p = p->ai_next) {
+  for (p = servinfo; p != NULL; p = p->ai_next) {
     if ((sockfd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == -1) {
       perror("server socket error");
       continue;
@@ -102,20 +102,23 @@ int main(int argc, char *argv[]) {
   printf("Now listening on IP %s and PORT %s\n", ip, port);
   printf("Waiting for new connections...\n");
 
-  while(1) {
+  while (1) {
     addr_size = sizeof their_addr;
-    new_fd = accept(sockfd, (struct sockaddr *) &their_addr, &addr_size);
+    new_fd = accept(sockfd, (struct sockaddr *)&their_addr, &addr_size);
     if (new_fd == -1) {
       perror("accept");
       continue;
     }
 
-    inet_ntop(their_addr.ss_family, get_in_addr((struct sockaddr *)&their_addr), s, sizeof s);
-
+    inet_ntop(their_addr.ss_family, get_in_addr((struct sockaddr *)&their_addr),
+              s, sizeof s);
 
     printf("Connection to %s established!\n Waiting for packages...\n", s);
 
     int connection = 1;
+
+    // buffer for http requests
+    char request_buffer[2048];
 
     while (connection) {
       char buf[1024];
@@ -146,7 +149,7 @@ int main(int argc, char *argv[]) {
       len = strlen(msg);
       bytes_sent = send(new_fd, msg, len, 0);
 
-      if(bytes_sent == -1) {
+      if (bytes_sent == -1) {
         perror("sending");
       } else {
         printf("Bytes sent: %d\n", bytes_sent);
