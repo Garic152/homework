@@ -47,22 +47,22 @@ def get_lattice_point_number(P, Q, T):
     width = upper_right_x - lower_left_x + 1
     height = upper_right_y - lower_left_y + 1
 
-    if width * height == 0:
+    if width * height <= 0:
         return "Der Schnitt der gegebenen Rechtecke ist leer."
 
     return f"Die Anzahl der Gitterpunkte im Rechteck betraegt {width * height}."
 
 
 # example1
-# P = (2, -1)
-# Q = (5, 8)
-# T = (6, 4)
-#
-# print(get_lattice_point_number(P, Q, T))
-# P, Q = convert_to_standard(P, Q)
-# print(P, Q)
-#
-# print(intersects(P, Q, T))
-#
-# print(get_delta_x1(P[0], Q[0], T[0]))
-# print(get_delta_x2(P[1], Q[1], T[1]))
+P = (-2, -2)
+Q = (0, 0)
+T = (4, 9)
+
+print(get_lattice_point_number(P, Q, T))
+P, Q = convert_to_standard(P, Q)
+print(P, Q)
+
+print(intersects(P, Q, T))
+
+print(get_delta_x1(P[0], Q[0], T[0]))
+print(get_delta_x2(P[1], Q[1], T[1]))
