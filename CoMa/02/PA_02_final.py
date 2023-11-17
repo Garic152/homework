@@ -16,21 +16,15 @@ def intersects(P, Q, T):
 
 
 def get_delta_x1(p1, q1, t1):
-    start = max(0, min(p1, q1))
-    end = min(t1, max(p1, q1))
-    if p1 > 0 and q1 < t1:
-        return max(0, end - start + 1)
-    else:
-        return max(0, end - start)
+    start = max(1, min(p1, q1))
+    end = min(t1 - 1, max(p1, q1))
+    return max(0, end - start + 1)
 
 
 def get_delta_x2(p2, q2, t2):
-    start = max(0, min(p2, q2))
-    end = min(t2, max(p2, q2))
-    if p2 > 0 and q2 < t2:
-        return max(0, end - start + 1)
-    else:
-        return max(0, end - start)
+    start = max(1, min(p2, q2))
+    end = min(t2 - 1, max(p2, q2))
+    return max(0, end - start + 1)
 
 
 def get_lattice_point_number(P, Q, T):
@@ -52,9 +46,9 @@ def get_lattice_point_number(P, Q, T):
 
 
 # example1
-P = (3, 5)
-Q = (-3, 7)
-T = (6, 5)
+P = (1, 1)
+Q = (1, 3)
+T = (4, 4)
 
 print(get_lattice_point_number(P, Q, T))
 P, Q = convert_to_standard(P, Q)
