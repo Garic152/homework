@@ -115,16 +115,13 @@ int main(int argc, char *argv[]) {
 
     printf("Connection to %s established!\n Waiting for packages...\n", s);
 
-    int connection = 1;
-
     // buffer for http requests
     char request_buffer[2048];
+    int request_length = 0;
 
-    while (connection) {
+    while (1) {
       char buf[1024];
       memset(buf, 0, sizeof buf);
-
-      char *msg = "Reply\n";
 
       int result = recv(new_fd, buf, sizeof buf, 0);
 
@@ -136,23 +133,24 @@ int main(int argc, char *argv[]) {
         return 0;
       }
 
-      buf[result] = '\0';
+      // write data to bigger request buf
+      strncat(request_buffer, buf, result);
+      request_length += result;
 
-      if (strncmp(buf, "exit", 4) == 0) {
-        printf("Connection closed\n");
-        msg = "Connection closed\n";
-        connection = 0;
-      }
+      if (strstr(request_buffer, "\r\n\r\n") != NULL) {
+        // send response
+        char *msg = "Reply\r\n\r\n";
+        int len = strlen(msg);
+        int bytes_sent = send(new_fd, msg, len, 0);
 
-      int len, bytes_sent;
-
-      len = strlen(msg);
-      bytes_sent = send(new_fd, msg, len, 0);
-
-      if (bytes_sent == -1) {
-        perror("sending");
-      } else {
-        printf("Bytes sent: %d\n", bytes_sent);
+        if (bytes_sent == -1) {
+          perror("sending");
+        } else {
+          printf("Response sent.\n");
+        }
+        // reset request_buffer memory
+        memset(request_buffer, 0, sizeof request_buffer);
+        request_length = 0;
       }
     }
     close(new_fd);
