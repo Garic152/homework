@@ -37,8 +37,6 @@ void http_response_handler(int new_fd, int status_code) {
 
   if (status_code == 400) {
     sprintf(msg, "400 Bad Request\r\n");
-  } else if (status_code == 413) {
-    sprintf(msg, "413 Buffer Overflow\r\n");
   }
 
   // send msg
@@ -49,50 +47,6 @@ void http_response_handler(int new_fd, int status_code) {
     perror("sending");
   } else {
     printf("Response sent.\n");
-  }
-}
-
-// function to handle https receiving and return msg
-char *receive_http_request(int new_fd) {
-  // buffer for http requests
-  char request_buffer[2048];
-  int request_length = 0;
-
-  while (1) {
-    char buf[1024];
-    memset(buf, 0, sizeof buf);
-
-    int result = recv(new_fd, buf, sizeof buf, 0);
-
-    if (result == -1) {
-      perror("recv");
-      return NULL;
-    } else if (result == 0) {
-      printf("Client closed the connection\n");
-      return NULL;
-    }
-
-    // write data to bigger request buf
-    strncat(request_buffer, buf, result);
-    request_length += result;
-
-    if (strstr(request_buffer, "\r\n\r\n") != NULL) {
-      // return response
-      char *dynamic_buffer = malloc(request_length + 1);
-      if (dynamic_buffer == NULL) {
-        perror("malloc");
-        return NULL;
-      }
-
-      // copy request into dynamic_buffer
-      memcpy(dynamic_buffer, request_buffer, request_length);
-      dynamic_buffer[request_length] = '\0';
-
-      return dynamic_buffer;
-    } else {
-      // handle buffer overflow
-      http_response_handler(new_fd, 413);
-    }
   }
 }
 
@@ -184,8 +138,33 @@ int main(int argc, char *argv[]) {
     char request_buffer[2048];
     int request_length = 0;
 
-    char *http_request = receive_http_request(new_fd);
+    while (1) {
+      char buf[1024];
+      memset(buf, 0, sizeof buf);
 
+      int result = recv(new_fd, buf, sizeof buf, 0);
+
+      if (result == -1) {
+        perror("recv");
+        return 0;
+      } else if (result == 0) {
+        printf("Client closed the connection\n");
+        return 0;
+      }
+
+      // write data to bigger request buf
+      strncat(request_buffer, buf, result);
+      request_length += result;
+
+      if (strstr(request_buffer, "\r\n\r\n") != NULL) {
+        // call http_response_handler
+        http_response_handler(new_fd, 400);
+
+        // reset request_buffer memory
+        memset(request_buffer, 0, sizeof request_buffer);
+        request_length = 0;
+      }
+    }
     close(new_fd);
     printf("Connection closed, waiting for new connection\n");
   }
