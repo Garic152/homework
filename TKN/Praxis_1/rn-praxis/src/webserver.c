@@ -14,6 +14,13 @@
 #define MYPORT "1234"
 #define BACKLOG 10
 
+typedef struct HttpRequest {
+  char *method;
+  char *resource;
+  char *version;
+  char *body;
+} HttpRequest;
+
 void sigchld_handler(int s) {
   int saved_errno = errno;
 
@@ -35,11 +42,13 @@ void http_response_handler(int new_fd, int status_code) {
   // set msg
   char msg[1024];
 
-  if (status_code == 400) {
-    sprintf(msg, "400 Bad Request\r\n");
-  } else if (status_code == 413) {
-    sprintf(msg, "413 Buffer Overflow\r\n");
-  }
+  sprintf(msg, "%d\r\n", status_code);
+
+  // if (status_code == 400) {
+  //   sprintf(msg, "400 Bad Request\r\n");
+  // } else if (status_code == 413) {
+  //   sprintf(msg, "413 Buffer Overflow\r\n");
+  // }
 
   // send msg
   int len = strlen(msg);
@@ -94,6 +103,37 @@ char *receive_http_request(int new_fd) {
       http_response_handler(new_fd, 413);
     }
   }
+}
+
+int parse_http_request(const char *http_request, HttpRequest *request) {
+  // using sscanf to get data out of the request
+  int result = sscanf(http_request, "%s %s %s\r\n", request->method,
+                      request->resource, request->version);
+
+  printf("Method:%s\n", request->method);
+  printf("Ressource:%s\n", request->resource);
+  printf("Version:%s\n", request->version);
+  printf("Result:%d\n", result);
+  // check if the headline is correct
+  if (result != 3) {
+    return 400;
+  }
+
+  // handle payload requests and check content_length
+  if (strcmp(request->method, "POST") == 0 ||
+      strcmp(request->method, "PUT") == 0) {
+    if (!strstr(http_request, "Content-Length:")) {
+      return 400;
+    }
+  }
+
+  // handle GET requests
+  if (strcmp(request->method, "GET") == 0) {
+    return 404;
+  }
+
+  // handle other cases
+  return 501;
 }
 
 int main(int argc, char *argv[]) {
@@ -180,11 +220,19 @@ int main(int argc, char *argv[]) {
 
     printf("Connection to %s established!\n Waiting for packages...\n", s);
 
-    // buffer for http requests
-    char request_buffer[2048];
-    int request_length = 0;
-
+    // get the full http_request
     char *http_request = receive_http_request(new_fd);
+
+    if (http_request != NULL) {
+      // create request struct instance to fill it with data of http_request
+      HttpRequest request;
+      request.method = malloc(100);
+      request.resource = malloc(100);
+      request.version = malloc(100);
+      int status_code = parse_http_request(http_request, &request);
+
+      http_response_handler(new_fd, status_code);
+    }
 
     close(new_fd);
     printf("Connection closed, waiting for new connection\n");

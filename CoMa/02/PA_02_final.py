@@ -46,9 +46,9 @@ def get_lattice_point_number(P, Q, T):
 
 
 # example1
-P = (1, 1)
-Q = (1, 3)
-T = (4, 4)
+P = (2, -1)
+Q = (5, 8)
+T = (6, 4)
 
 print(get_lattice_point_number(P, Q, T))
 P, Q = convert_to_standard(P, Q)
