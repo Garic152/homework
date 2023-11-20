@@ -21,6 +21,8 @@ typedef struct HttpRequest {
   char *body;
 } HttpRequest;
 
+const int REQUEST_SIZE = 64;
+
 void sigchld_handler(int s) {
   int saved_errno = errno;
 
@@ -64,7 +66,9 @@ void http_response_handler(int new_fd, int status_code) {
 // function to handle https receiving and return msg
 char *receive_http_request(int new_fd) {
   // buffer for http requests
-  char request_buffer[2048];
+  char request_buffer[4096];
+  memset(request_buffer, 0, sizeof(request_buffer));
+
   int request_length = 0;
 
   while (1) {
@@ -107,7 +111,7 @@ char *receive_http_request(int new_fd) {
 
 int parse_http_request(const char *http_request, HttpRequest *request) {
   // using sscanf to get data out of the request
-  int result = sscanf(http_request, "%s %s %s\r\n", request->method,
+  int result = sscanf(http_request, "%63s %63s %63s\r\n", request->method,
                       request->resource, request->version);
 
   printf("Method:%s\n", request->method);
@@ -226,10 +230,22 @@ int main(int argc, char *argv[]) {
     if (http_request != NULL) {
       // create request struct instance to fill it with data of http_request
       HttpRequest request;
-      request.method = malloc(100);
-      request.resource = malloc(100);
-      request.version = malloc(100);
+
+      request.method = malloc(REQUEST_SIZE);
+      request.resource = malloc(REQUEST_SIZE);
+      request.version = malloc(REQUEST_SIZE);
+
+      memset(request.method, 0, REQUEST_SIZE);
+      memset(request.resource, 0, REQUEST_SIZE);
+      memset(request.version, 0, REQUEST_SIZE);
+
       int status_code = parse_http_request(http_request, &request);
+
+      free(request.method);
+      free(request.resource);
+      free(request.version);
+
+      free(http_request);
 
       http_response_handler(new_fd, status_code);
     }
