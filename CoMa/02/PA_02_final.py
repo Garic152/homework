@@ -31,8 +31,8 @@ def get_lattice_point_number(P, Q, T):
     if T[0] < 0 or T[1] < 0:
         return "Die Eingabe ist fehlerhaft."
 
-    if not intersects(P, Q, T):
-        return "Der Schnitt der gegebenen Rechtecke ist leer."
+        # if not intersects(P, Q, T):
+        # return "Der Schnitt der gegebenen Rechtecke ist leer."
 
     lower_left_x = max(0, min(P[0], Q[0]))
     lower_left_y = max(0, min(P[1], Q[1]))
