@@ -19,6 +19,7 @@ typedef struct HttpRequest {
   char *resource;
   char *version;
   char *body;
+  char *content;
 } HttpRequest;
 
 const int REQUEST_SIZE = 64;
@@ -40,11 +41,30 @@ void *get_in_addr(struct sockaddr *sa) {
   return &(((struct sockaddr_in6 *)sa)->sin6_addr);
 }
 
-void http_response_handler(int new_fd, int status_code) {
+void http_response_handler(int new_fd, int status_code, const char *content) {
   // set msg
   char msg[1024];
 
-  sprintf(msg, "%d\r\n", status_code);
+  int bytes_sent;
+
+  if (status_code == 200 && content != NULL) {
+    char header[1024];
+    sprintf(header, "HTTP/1.1 200 OK\r\nContent-Length: %ld\r\n\r\n",
+            strlen(content));
+    bytes_sent = send(new_fd, header, strlen(header), 0);
+    bytes_sent = send(new_fd, content, strlen(content), 0);
+  } else if (status_code == 400) {
+    sprintf(msg, "HTTP/1.1 400 Bad Request\r\n\r\n");
+  } else if (status_code == 404) {
+    sprintf(msg, "HTTP/1.1 404 Not Found\r\n\r\n");
+  } else if (status_code == 413) {
+    sprintf(msg, "HTTP/1.1 413 Payload Too Large\r\n\r\n");
+  } else if (status_code == 501) {
+    sprintf(msg, "HTTP/1.1 501 Not Implemented\r\n\r\n");
+  } else {
+    // Default response or for other status codes
+    sprintf(msg, "HTTP/1.1 %d\r\n\r\n", status_code);
+  }
 
   // if (status_code == 400) {
   //   sprintf(msg, "400 Bad Request\r\n");
@@ -54,8 +74,10 @@ void http_response_handler(int new_fd, int status_code) {
 
   // send msg
   int len = strlen(msg);
-  int bytes_sent = send(new_fd, msg, len, 0);
 
+  if (status_code != 200) {
+    bytes_sent = send(new_fd, msg, len, 0);
+  }
   if (bytes_sent == -1) {
     perror("sending");
   } else {
@@ -70,43 +92,54 @@ char *receive_http_request(int new_fd) {
   memset(request_buffer, 0, sizeof(request_buffer));
 
   int request_length = 0;
+  int header_end_found = 0;
 
-  while (1) {
+  while (!header_end_found) {
     char buf[1024];
     memset(buf, 0, sizeof buf);
 
-    int result = recv(new_fd, buf, sizeof buf, 0);
+    int result = recv(new_fd, buf, sizeof(buf) - 1, 0);
 
     if (result == -1) {
       perror("recv");
-      return NULL;
+      break;
     } else if (result == 0) {
       printf("Client closed the connection\n");
+      break;
+    }
+
+    // write data to bigger request buf and check if it is full
+    if (request_length + result < sizeof(request_buffer) - 1) {
+      memcpy(request_buffer + request_length, buf, result);
+      request_length += result;
+      request_buffer[request_length] = '\0';
+      printf("Received HTTP Request:%s\n", request_buffer);
+    } else {
+      // buffer is full
+      http_response_handler(new_fd, 413, NULL);
+      printf("BUFFER IS FULL!\n");
       return NULL;
     }
 
-    // write data to bigger request buf
-    strncat(request_buffer, buf, result);
-    request_length += result;
-
+    // check end of received string for http end
     if (strstr(request_buffer, "\r\n\r\n") != NULL) {
-      // return response
-      char *dynamic_buffer = malloc(request_length + 1);
-      if (dynamic_buffer == NULL) {
-        perror("malloc");
-        return NULL;
-      }
-
-      // copy request into dynamic_buffer
-      memcpy(dynamic_buffer, request_buffer, request_length);
-      dynamic_buffer[request_length] = '\0';
-
-      return dynamic_buffer;
+      header_end_found = 1;
     } else {
-      // handle buffer overflow
-      http_response_handler(new_fd, 413);
+      printf("End not found, waiting for the rest of the HTTP.\n");
     }
   }
+
+  // return response
+  char *dynamic_buffer = malloc(request_length + 1);
+  if (dynamic_buffer == NULL) {
+    perror("dynbuf malloc");
+    return NULL;
+  }
+
+  // copy request into dynamic_buffer
+  memcpy(dynamic_buffer, request_buffer, request_length);
+  dynamic_buffer[request_length] = '\0';
+  return dynamic_buffer;
 }
 
 int parse_http_request(const char *http_request, HttpRequest *request) {
@@ -123,6 +156,12 @@ int parse_http_request(const char *http_request, HttpRequest *request) {
     return 400;
   }
 
+  // convert filepath
+  if (request->resource[0] == '/') {
+    memmove(request->resource, request->resource + 1,
+            strlen(request->resource));
+  }
+
   // handle payload requests and check content_length
   if (strcmp(request->method, "POST") == 0 ||
       strcmp(request->method, "PUT") == 0) {
@@ -133,6 +172,27 @@ int parse_http_request(const char *http_request, HttpRequest *request) {
 
   // handle GET requests
   if (strcmp(request->method, "GET") == 0) {
+    FILE *fptr;
+    fptr = fopen(request->resource, "r");
+
+    if (fptr != NULL) {
+      // read file content
+      fseek(fptr, 0, SEEK_END);
+      long fsize = ftell(fptr);
+      fseek(fptr, 0, SEEK_SET);
+
+      // pass content into HttpRequest struct
+      request->content = malloc(fsize + 1);
+      if (request->content == NULL) {
+        fclose(fptr);
+        return 500;
+      }
+      fread(request->content, 1, fsize, fptr);
+      fclose(fptr);
+      request->content[fsize] = 0;
+
+      return 200;
+    }
     return 404;
   }
 
@@ -223,33 +283,63 @@ int main(int argc, char *argv[]) {
               s, sizeof s);
 
     printf("Connection to %s established!\n Waiting for packages...\n", s);
+    while (1) {
+      // get the full http_request
+      char *http_request = receive_http_request(new_fd);
 
-    // get the full http_request
-    char *http_request = receive_http_request(new_fd);
+      if (http_request == NULL)
+        break;
 
-    if (http_request != NULL) {
-      // create request struct instance to fill it with data of http_request
-      HttpRequest request;
+      if (http_request != NULL) {
+        // create request struct instance to fill it with data of http_request
+        HttpRequest request;
 
-      request.method = malloc(REQUEST_SIZE);
-      request.resource = malloc(REQUEST_SIZE);
-      request.version = malloc(REQUEST_SIZE);
+        request.method = malloc(REQUEST_SIZE);
+        if (request.method == NULL) {
+          perror("request.method malloc");
+          break;
+        }
 
-      memset(request.method, 0, REQUEST_SIZE);
-      memset(request.resource, 0, REQUEST_SIZE);
-      memset(request.version, 0, REQUEST_SIZE);
+        request.resource = malloc(REQUEST_SIZE);
+        if (request.resource == NULL) {
+          perror("request.resource malloc");
+          break;
+        }
 
-      int status_code = parse_http_request(http_request, &request);
+        request.version = malloc(REQUEST_SIZE);
+        if (request.version == NULL) {
+          perror("request.version malloc");
+          break;
+        }
 
-      free(request.method);
-      free(request.resource);
-      free(request.version);
+        request.content = malloc(REQUEST_SIZE);
+        if (request.version == NULL) {
+          perror("request.version malloc");
+          break;
+        }
 
-      free(http_request);
+        memset(request.method, 0, REQUEST_SIZE);
+        memset(request.resource, 0, REQUEST_SIZE);
+        memset(request.version, 0, REQUEST_SIZE);
+        memset(request.content, 0, REQUEST_SIZE);
 
-      http_response_handler(new_fd, status_code);
+        int status_code = parse_http_request(http_request, &request);
+
+        free(request.method);
+        free(request.resource);
+        free(request.version);
+
+        free(http_request);
+
+        http_response_handler(new_fd, status_code, request.content);
+
+        free(request.content);
+
+        // if (strcmp(request.version, "HTTP/1.0") == 0 || status_code != 200) {
+        //  break; // Close the connection for HTTP/1.0 or if there's an error
+        //}
+      }
     }
-
     close(new_fd);
     printf("Connection closed, waiting for new connection\n");
   }

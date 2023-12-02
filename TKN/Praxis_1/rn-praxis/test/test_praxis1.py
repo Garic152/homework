@@ -4,7 +4,17 @@ import socket
 import time
 from http.client import HTTPConnection
 
-from util import KillOnExit, randbytes
+from util import KillOnExit
+
+# Python 3.8 comptability
+import sys
+if sys.version_info[:3] >= (3, 9):
+    from random import randbytes
+else:
+    from random import randint
+
+    def randbytes(n):
+        return bytes(randint(0, 255) for _ in range(n))
 
 
 executable = 'build/webserver'
@@ -83,7 +93,7 @@ def test_httpreply():
         conn.send('Request\r\n\r\n'.encode())
         time.sleep(.5)  # Attempt to gracefully handle all kinds of multi-packet replies...
         reply = conn.recv(1024)
-        assert re.search(br'HTTP/1.[01] 400.*\r\n\r\n', reply)
+        assert re.search(br'HTTP/1.[01] 400.*\r\n(.*\r\n)*\r\n', reply)
 
 
 def test_httpreplies():
