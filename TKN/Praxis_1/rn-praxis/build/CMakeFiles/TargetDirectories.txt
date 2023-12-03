@@ -1,4 +1,5 @@
-/home/eric/TKN/Praxis_1/rn-praxis/build/CMakeFiles/package.dir
-/home/eric/TKN/Praxis_1/rn-praxis/build/CMakeFiles/package_source.dir
-/home/eric/TKN/Praxis_1/rn-praxis/build/CMakeFiles/edit_cache.dir
-/home/eric/TKN/Praxis_1/rn-praxis/build/CMakeFiles/rebuild_cache.dir
+/home/eric/homework/TKN/Praxis_1/rn-praxis/build/CMakeFiles/webserver.dir
+/home/eric/homework/TKN/Praxis_1/rn-praxis/build/CMakeFiles/package.dir
+/home/eric/homework/TKN/Praxis_1/rn-praxis/build/CMakeFiles/package_source.dir
+/home/eric/homework/TKN/Praxis_1/rn-praxis/build/CMakeFiles/edit_cache.dir
+/home/eric/homework/TKN/Praxis_1/rn-praxis/build/CMakeFiles/rebuild_cache.dir

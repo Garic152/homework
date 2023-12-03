@@ -1,4 +1,4 @@
-# Install script for directory: /home/eric/TKN/Praxis_1/rn-praxis
+# Install script for directory: /home/eric/homework/TKN/Praxis_1/rn-praxis
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
@@ -50,5 +50,5 @@ endif()
 
 string(REPLACE ";" "\n" CMAKE_INSTALL_MANIFEST_CONTENT
        "${CMAKE_INSTALL_MANIFEST_FILES}")
-file(WRITE "/home/eric/TKN/Praxis_1/rn-praxis/build/${CMAKE_INSTALL_MANIFEST}"
+file(WRITE "/home/eric/homework/TKN/Praxis_1/rn-praxis/build/${CMAKE_INSTALL_MANIFEST}"
      "${CMAKE_INSTALL_MANIFEST_CONTENT}")
