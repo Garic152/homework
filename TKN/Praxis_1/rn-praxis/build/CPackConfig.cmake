@@ -60,7 +60,7 @@ set(CPACK_RESOURCE_FILE_README "/usr/share/cmake/Templates/CPack.GenericDescript
 set(CPACK_RESOURCE_FILE_WELCOME "/usr/share/cmake/Templates/CPack.GenericWelcome.txt")
 set(CPACK_SET_DESTDIR "OFF")
 set(CPACK_SOURCE_GENERATOR "TGZ")
-set(CPACK_SOURCE_IGNORE_FILES "/home/eric/homework/TKN/Praxis_1/rn-praxis/build;/\\..*\$")
+set(CPACK_SOURCE_IGNORE_FILES "/home/eric/homework/TKN/Praxis_1/rn-praxis/build;/\\..*\$;.git;.venv")
 set(CPACK_SOURCE_OUTPUT_CONFIG_FILE "/home/eric/homework/TKN/Praxis_1/rn-praxis/build/CPackSourceConfig.cmake")
 set(CPACK_SYSTEM_NAME "Linux")
 set(CPACK_THREADS "1")

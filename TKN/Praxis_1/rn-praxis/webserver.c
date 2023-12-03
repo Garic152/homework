@@ -47,7 +47,7 @@ void http_response_handler(int new_fd, int status_code, const char *content) {
 
   int bytes_sent;
 
-  if (status_code == 200) {
+  if (status_code == 200 && content != NULL) {
     char header[1024];
     sprintf(msg,
             "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: "
@@ -67,7 +67,7 @@ void http_response_handler(int new_fd, int status_code, const char *content) {
     sprintf(msg, "HTTP/1.1 204 No Content\r\nContent-Length: 0\r\n\r\n");
   } else {
     // Default response or for other status codes
-    sprintf(msg, "HTTP/1.1 %d\r\n\r\n", status_code);
+    sprintf(msg, "HTTP/1.1 %d\r\nContent-Length: 0\r\n\r\n", status_code);
   }
 
   // if (status_code == 400) {
@@ -90,7 +90,7 @@ void http_response_handler(int new_fd, int status_code, const char *content) {
 // function to handle https receiving and return msg
 char *receive_http_request(int new_fd) {
   // buffer for http requests
-  char request_buffer[4096];
+  char request_buffer[4096 * 2];
   memset(request_buffer, 0, sizeof(request_buffer));
 
   int request_length = 0;
@@ -196,6 +196,8 @@ int parse_http_request(const char *http_request, HttpRequest *request) {
       fseek(fptr, 0, SEEK_END);
       long fsize = ftell(fptr);
       fseek(fptr, 0, SEEK_SET);
+
+      free(request->content);
 
       // pass content into HttpRequest struct
       request->content = malloc(fsize + 1);
@@ -364,24 +366,34 @@ int main(int argc, char *argv[]) {
 
         request.resource = malloc(REQUEST_SIZE);
         if (request.resource == NULL) {
+          free(request.method);
           perror("request.resource malloc");
           break;
         }
 
         request.version = malloc(REQUEST_SIZE);
         if (request.version == NULL) {
+          free(request.method);
+          free(request.resource);
           perror("request.version malloc");
           break;
         }
 
         request.content = malloc(REQUEST_SIZE);
         if (request.content == NULL) {
+          free(request.method);
+          free(request.resource);
+          free(request.version);
           perror("request.version malloc");
           break;
         }
 
         request.body = malloc(REQUEST_SIZE);
         if (request.body == NULL) {
+          free(request.method);
+          free(request.resource);
+          free(request.content);
+          free(request.version);
           perror("request.version malloc");
           break;
         }

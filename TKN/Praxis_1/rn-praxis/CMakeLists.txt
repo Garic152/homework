@@ -6,9 +6,6 @@ add_executable(webserver webserver.c)
 
 # Packaging
 set(CPACK_SOURCE_GENERATOR "TGZ")
-set(CPACK_SOURCE_IGNORE_FILES
-  ${CMAKE_BINARY_DIR}
-  /\\..*$
-)
+set(CPACK_SOURCE_IGNORE_FILES ${CMAKE_BINARY_DIR} /\\..*$ .git .venv)
 set(CPACK_VERBATIM_VARIABLES YES)
 include(CPack)
