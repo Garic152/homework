@@ -47,20 +47,24 @@ void http_response_handler(int new_fd, int status_code, const char *content) {
 
   int bytes_sent;
 
-  if (status_code == 200 && content != NULL) {
+  if (status_code == 200) {
     char header[1024];
     sprintf(msg,
             "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: "
             "%lu\r\n\r\n%s",
             strlen(content), content);
   } else if (status_code == 400) {
-    sprintf(msg, "HTTP/1.1 400 Bad Request\r\n\r\n");
+    sprintf(msg, "HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\n\r\n");
   } else if (status_code == 404) {
-    sprintf(msg, "HTTP/1.1 404 Not Found\r\n\r\n");
+    sprintf(msg, "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\n\r\n");
   } else if (status_code == 413) {
-    sprintf(msg, "HTTP/1.1 413 Payload Too Large\r\n\r\n");
+    sprintf(msg, "HTTP/1.1 413 Payload Too Large\r\nContent-Length: 0\r\n\r\n");
   } else if (status_code == 501) {
-    sprintf(msg, "HTTP/1.1 501 Not Implemented\r\n\r\n");
+    sprintf(msg, "HTTP/1.1 501 Not Implemented\r\nContent-Length: 0\r\n\r\n");
+  } else if (status_code == 201) {
+    sprintf(msg, "HTTP/1.1 201 Created\r\nContent-Length: 0\r\n\r\n");
+  } else if (status_code == 204) {
+    sprintf(msg, "HTTP/1.1 204 No Content\r\nContent-Length: 0\r\n\r\n");
   } else {
     // Default response or for other status codes
     sprintf(msg, "HTTP/1.1 %d\r\n\r\n", status_code);
@@ -154,6 +158,20 @@ int parse_http_request(const char *http_request, HttpRequest *request) {
     return 400;
   }
 
+  const char *headers_start = strstr(http_request, "\r\n") + 2;
+  const char *content_length_str = "Content-Length: ";
+  const char *content_length_pos = strstr(http_request, content_length_str);
+
+  if (content_length_pos) {
+    int content_length;
+    sscanf(content_length_pos, "Content-Length: %d", &content_length);
+
+    const char *body_start = strstr(headers_start, "\r\n\r\n") + 4;
+    if (body_start) {
+      strncpy(request->body, body_start, content_length);
+    }
+  }
+
   // convert filepath
   if (request->resource[0] == '/') {
     memmove(request->resource, request->resource + 1,
@@ -198,6 +216,46 @@ int parse_http_request(const char *http_request, HttpRequest *request) {
       return 200;
     }
     return 404;
+  } else if (strcmp(request->method, "PUT") == 0) {
+    int existed = 0;
+
+    FILE *fptr = fopen(request->resource, "r");
+
+    if (fptr) {
+      existed = 1;
+      fclose(fptr);
+    }
+
+    fptr = fopen(request->resource, "w");
+
+    if (fptr) {
+      fprintf(fptr, "%s", request->body);
+      fclose(fptr);
+
+      if (existed) {
+        return 204;
+      } else {
+        return 201;
+      }
+    }
+  } else if (strcmp(request->method, "DELETE") == 0) {
+    int existed = 0;
+
+    FILE *fptr = fopen(request->resource, "r");
+
+    if (fptr) {
+      existed = 1;
+      fclose(fptr);
+    }
+
+    if (fptr) {
+      remove(request->resource);
+      if (existed) {
+        return 204;
+      } else {
+        return 404;
+      }
+    }
   }
 
   // handle other cases
@@ -317,7 +375,13 @@ int main(int argc, char *argv[]) {
         }
 
         request.content = malloc(REQUEST_SIZE);
-        if (request.version == NULL) {
+        if (request.content == NULL) {
+          perror("request.version malloc");
+          break;
+        }
+
+        request.body = malloc(REQUEST_SIZE);
+        if (request.body == NULL) {
           perror("request.version malloc");
           break;
         }
@@ -326,12 +390,14 @@ int main(int argc, char *argv[]) {
         memset(request.resource, 0, REQUEST_SIZE);
         memset(request.version, 0, REQUEST_SIZE);
         memset(request.content, 0, REQUEST_SIZE);
+        memset(request.body, 0, REQUEST_SIZE);
 
         int status_code = parse_http_request(http_request, &request);
 
         free(request.method);
         free(request.resource);
         free(request.version);
+        free(request.body);
 
         free(http_request);
 
