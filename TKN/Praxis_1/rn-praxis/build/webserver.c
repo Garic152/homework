@@ -49,10 +49,10 @@ void http_response_handler(int new_fd, int status_code, const char *content) {
 
   if (status_code == 200 && content != NULL) {
     char header[1024];
-    sprintf(header, "HTTP/1.1 200 OK\r\nContent-Length: %ld\r\n\r\n",
-            strlen(content));
-    bytes_sent = send(new_fd, header, strlen(header), 0);
-    bytes_sent = send(new_fd, content, strlen(content), 0);
+    sprintf(msg,
+            "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: "
+            "%lu\r\n\r\n%s",
+            strlen(content), content);
   } else if (status_code == 400) {
     sprintf(msg, "HTTP/1.1 400 Bad Request\r\n\r\n");
   } else if (status_code == 404) {
@@ -75,9 +75,7 @@ void http_response_handler(int new_fd, int status_code, const char *content) {
   // send msg
   int len = strlen(msg);
 
-  if (status_code != 200) {
-    bytes_sent = send(new_fd, msg, len, 0);
-  }
+  bytes_sent = send(new_fd, msg, len, 0);
   if (bytes_sent == -1) {
     perror("sending");
   } else {
