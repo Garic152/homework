@@ -185,9 +185,15 @@ int parse_http_request(const char *http_request, HttpRequest *request) {
         fclose(fptr);
         return 500;
       }
+
       fread(request->content, 1, fsize, fptr);
       fclose(fptr);
-      request->content[fsize] = 0;
+
+      if (fsize > 0 && request->content[fsize - 1] == '\n') {
+        request->content[fsize - 1] = '\0';
+      } else {
+        request->content[fsize] = '\0';
+      }
 
       return 200;
     }
