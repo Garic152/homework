@@ -1,7 +1,7 @@
 def get_optimal_line(points):
     # calculate average
-    x_average = 0.0
-    y_average = 0.0
+    x_average = 0
+    y_average = 0
     count = 0
 
     for point in points:
@@ -13,8 +13,8 @@ def get_optimal_line(points):
     y_average /= count
 
     # calculate sums
-    top_sum = 0.0
-    bottom_sum = 0.0
+    top_sum = 0
+    bottom_sum = 0
 
     for point in points:
         top_sum += (point[0] - x_average) * (point[1] - y_average)
