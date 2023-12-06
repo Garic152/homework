@@ -25,11 +25,11 @@ def get_optimal_line(points):
 
     b = y_average - a * x_average
 
-    return (a, b)
+    return (round(a, 4), round(b, 4))
 
 
 def get_linedistance(points, line):
-    linedistance = 0.0
+    linedistance = 0
 
     # calculate linedistance
     for point in points:
@@ -48,4 +48,4 @@ def distance_to_opt(points, lines):
 
     d1 = get_linedistance(points, (a, b))
 
-    return abs((min(distances) - d1))
+    return round(abs((min(distances) - d1)), 4)
