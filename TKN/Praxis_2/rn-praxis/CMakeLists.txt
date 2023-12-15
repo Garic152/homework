@@ -2,9 +2,11 @@ cmake_minimum_required (VERSION 3.5)
 project (RN-Praxis)
 set (CMAKE_C_STANDARD 11)
 
-add_executable (webserver webserver.c http.c util.c data.c)
+find_package(OpenSSL REQUIRED)
+
+add_executable (webserver webserver.c http.c util.c data.c hashing.c)
 target_compile_options (webserver PRIVATE -Wall -Wextra -Wpedantic)
-target_link_libraries(webserver PRIVATE -lm)
+target_link_libraries(webserver PRIVATE -lm OpenSSL::SSL OpenSSL::Crypto)
 
 # Packaging
 set(CPACK_SOURCE_GENERATOR "TGZ")
