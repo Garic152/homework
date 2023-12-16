@@ -25,6 +25,17 @@ struct tuple resources[MAX_RESOURCES] = {
     {"/static/bar", "Bar", sizeof "Bar" - 1},
     {"/static/baz", "Baz", sizeof "Baz" - 1}};
 
+typedef struct {
+  uint32_t id;
+  struct in_addr ip;
+  uint16_t port;
+} DHT_Node;
+
+typedef struct {
+  DHT_Node predecessor;
+  DHT_Node successor;
+} DHT_NEIGHBOR;
+
 /**
  * Sends an HTTP reply to the client based on the received request.
  *
@@ -295,9 +306,21 @@ static int setup_server_socket(struct sockaddr_in addr, int is_udp) {
  *  ./build/webserver self.ip self.port
  */
 int main(int argc, char **argv) {
-  if (argc != 3) {
+  if (argc != 4) {
     return EXIT_FAILURE;
   }
+
+  uint32_t local_id = (uint32_t)atoi(argv[3]);
+
+  // parse env variables into DHT_NEIGHBOR
+  DHT_NEIGHBOR neighbors;
+  neighbors.predecessor.id = (uint32_t)atoi(getenv("PRED_ID"));
+  inet_pton(AF_INET, getenv("PRED_IP"), &neighbors.predecessor.ip);
+  neighbors.predecessor.port = (uint16_t)atoi(getenv("PRED_PORT"));
+
+  neighbors.successor.id = (uint32_t)atoi(getenv("PRED_ID"));
+  inet_pton(AF_INET, getenv("PRED_IP"), &neighbors.successor.ip);
+  neighbors.successor.port = (uint16_t)atoi(getenv("PRED_PORT"));
 
   struct sockaddr_in addr = derive_sockaddr(argv[1], argv[2]);
 
