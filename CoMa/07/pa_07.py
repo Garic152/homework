@@ -45,7 +45,7 @@ def unique(input_list):
     """
 
     if not input_list:
-        return 0
+        return []
 
     # Create new list containing the first/smallest entry of the input_list
     index = 0
