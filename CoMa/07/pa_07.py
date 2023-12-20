@@ -4,12 +4,15 @@ using binary search.
 unique(L): Implement list(set(L)) using binary search
 """
 
-
 def find_first_larger(input_list, element):
     """
     Takes an input_list and a element and returns the index
     of the first larger element.
     """
+
+    if not input_list:
+        return 0
+
     # Define boundaries of the array
     high = len(input_list) - 1
     low = 0
@@ -40,6 +43,10 @@ def unique(input_list):
     Takes an input_list and uses the find_first_larger()
     to return the input_list without duplicates
     """
+
+    if not input_list:
+        return 0
+
     # Create new list containing the first/smallest entry of the input_list
     index = 0
     list_sorted = [input_list[0]]
