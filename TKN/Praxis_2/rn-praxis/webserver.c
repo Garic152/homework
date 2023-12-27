@@ -9,6 +9,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/epoll.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -19,6 +20,7 @@
 
 #define MAX_RESOURCES 100
 #define BUFLEN 512
+#define EPOLL_MAX_EVENTS 10
 
 struct tuple resources[MAX_RESOURCES] = {
     {"/static/foo", "Foo", sizeof "Foo" - 1},
@@ -29,12 +31,14 @@ typedef struct {
   uint32_t id;
   struct in_addr ip;
   uint16_t port;
-} DHT_Node;
+  struct tuple resources[50];
+} DHT;
 
 typedef struct {
-  DHT_Node predecessor;
-  DHT_Node successor;
-} DHT_NEIGHBOR;
+  DHT predecessor;
+  DHT current;
+  DHT successor;
+} DHT_NODE;
 
 /**
  * Sends an HTTP reply to the client based on the received request.
@@ -299,30 +303,55 @@ static int setup_server_socket(struct sockaddr_in addr, int is_udp) {
 }
 
 /**
- *  The program expects 3; otherwise, it returns EXIT_FAILURE.
+ *  The program expects 5; otherwise, it returns EXIT_FAILURE.
  *
  *  Call as:
  *
- *  ./build/webserver self.ip self.port
+ *  ./build/webserver self.ip self.port self.id
  */
 int main(int argc, char **argv) {
-  if (argc != 4) {
-    return EXIT_FAILURE;
+  // if (argc != 4) {
+  //   return EXIT_FAILURE;
+  // }
+
+  if (argc == 4) {
+    const int MAX_NODES = 2;
+    DHT_NODE nodes[MAX_NODES];
+
+    // parse env variables into DHT_NODE
+    nodes[0].predecessor.id = (uint32_t)atoi(argv[3]);
+    inet_pton(AF_INET, getenv("PRED_IP"), &nodes[0].predecessor.ip);
+    nodes[0].predecessor.port = (uint32_t)atoi(argv[2]);
+
+    nodes[0].current.id = (uint32_t)atoi(getenv("PRED_ID"));
+    inet_pton(AF_INET, getenv("PRED_IP"), &nodes[0].current.ip);
+    nodes[0].current.port = (uint16_t)atoi(getenv("PRED_PORT"));
+
+    nodes[0].successor.id = (uint32_t)atoi(argv[3]);
+    inet_pton(AF_INET, getenv("PRED_IP"), &nodes[0].successor.ip);
+    nodes[0].successor.port = (uint32_t)atoi(argv[2]);
+
+    nodes[1].predecessor.id = (uint32_t)atoi(getenv("PRED_ID"));
+    inet_pton(AF_INET, getenv("PRED_IP"), &nodes[1].predecessor.ip);
+    nodes[1].predecessor.port = (uint16_t)atoi(getenv("PRED_PORT"));
+
+    nodes[1].current.id = (uint32_t)atoi(argv[3]);
+    inet_pton(AF_INET, getenv("PRED_IP"), &nodes[1].current.ip);
+    nodes[1].current.port = (uint16_t)atoi(argv[2]);
+
+    nodes[1].successor.id = (uint32_t)atoi(getenv("SUCC_ID"));
+    inet_pton(AF_INET, getenv("SUCC_IP"), &nodes[1].successor.ip);
+    nodes[1].successor.port = (uint16_t)atoi(getenv("SUCC_PORT"));
   }
 
-  uint32_t local_id = (uint32_t)atoi(argv[3]);
-
-  // parse env variables into DHT_NEIGHBOR
-  DHT_NEIGHBOR neighbors;
-  neighbors.predecessor.id = (uint32_t)atoi(getenv("PRED_ID"));
-  inet_pton(AF_INET, getenv("PRED_IP"), &neighbors.predecessor.ip);
-  neighbors.predecessor.port = (uint16_t)atoi(getenv("PRED_PORT"));
-
-  neighbors.successor.id = (uint32_t)atoi(getenv("PRED_ID"));
-  inet_pton(AF_INET, getenv("PRED_IP"), &neighbors.successor.ip);
-  neighbors.successor.port = (uint16_t)atoi(getenv("PRED_PORT"));
-
   struct sockaddr_in addr = derive_sockaddr(argv[1], argv[2]);
+
+  // Initialize epoll()
+  int epoll_fd = epoll_create1(0);
+  if (epoll_fd == 1) {
+    perror("epoll");
+    return 1;
+  }
 
   // Set up a TCP server socket.
   int tcp_server_socket = setup_server_socket(addr, 0);
@@ -330,34 +359,38 @@ int main(int argc, char **argv) {
   // Set up a UDP server socket.
   int udp_server_socket = setup_server_socket(addr, 1);
 
-  // Create an array of pollfd structures to monitor sockets.
-  struct pollfd sockets[2] = {
-      {.fd = tcp_server_socket, .events = POLLIN},
-      {.fd = udp_server_socket, .events = POLLIN},
-  };
+  struct epoll_event ev;
+  ev.events = EPOLLIN;
+
+  ev.data.fd = tcp_server_socket;
+  if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, tcp_server_socket, &ev) == -1) {
+    perror("epoll_ctl: tcp_server_socket");
+    exit(EXIT_FAILURE);
+  }
+
+  ev.data.fd = udp_server_socket;
+  if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, udp_server_socket, &ev) == -1) {
+    perror("epoll_ctl: udp_server_socket");
+    exit(EXIT_FAILURE);
+  }
 
   struct connection_state state = {0};
+
+  struct epoll_event events[EPOLL_MAX_EVENTS];
+
   while (true) {
 
-    // Use poll() to wait for events on the monitored sockets.
-    int ready = poll(sockets, sizeof(sockets) / sizeof(sockets[0]), -1);
-    if (ready == -1) {
-      perror("poll");
+    // Use epoll() to wait for events on the monitored sockets.
+    int n = epoll_wait(epoll_fd, events, EPOLL_MAX_EVENTS, -1);
+    if (n == -1) {
+      perror("epoll wait");
       exit(EXIT_FAILURE);
     }
 
     // Process events on the monitored sockets.
-    for (size_t i = 0; i < sizeof(sockets) / sizeof(sockets[0]); i += 1) {
-      if (sockets[i].revents != POLLIN) {
-        // If there are no POLLIN events on the socket, continue to the next
-        // iteration.
-        continue;
-      }
-      int s = sockets[i].fd;
-
-      if (s == tcp_server_socket) {
-
-        printf("RECEIVED TCP\n");
+    for (int i = 0; i < n; i++) {
+      // Check if current connection is tcp
+      if (events[i].data.fd == tcp_server_socket) {
         // If the event is on the server_socket, accept a new connection from a
         // client.
         int connection = accept(tcp_server_socket, NULL, NULL);
@@ -365,18 +398,17 @@ int main(int argc, char **argv) {
           close(tcp_server_socket);
           perror("accept");
           exit(EXIT_FAILURE);
-        } else {
-          connection_setup(&state, connection);
-
-          // limit to one connection at a time
-          sockets[0].events = 0;
-          sockets[1].fd = connection;
-          sockets[1].events = POLLIN;
+        } // else {
+        connection_setup(&state, connection);
+        // Close connection
+        ev.events = EPOLLIN;
+        ev.data.fd = connection;
+        if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, connection, &ev) == -1) {
+          perror("epoll_ctl: connection");
+          close(connection);
         }
-      } else if (s == udp_server_socket) {
-
-        printf("RECEIVED UDP\n");
-
+        // else handle data from udp
+      } else if (events[i].data.fd == udp_server_socket) {
         char buffer[BUFLEN];
         struct sockaddr_in sender_addr;
         socklen_t sender_addr_len = sizeof(sender_addr);
@@ -388,15 +420,18 @@ int main(int argc, char **argv) {
           perror("recfrom");
         }
       } else {
-        assert(s == state.sock);
+        int conn_fd = events[i].data.fd;
+
+        state.sock = conn_fd;
 
         // Call the 'handle_connection' function to process the incoming data on
         // the socket.
         bool cont = handle_connection(&state);
         if (!cont) { // get ready for a new connection
-          sockets[0].events = POLLIN;
-          sockets[1].fd = -1;
-          sockets[1].events = 0;
+          if (epoll_ctl(epoll_fd, EPOLL_CTL_DEL, conn_fd, NULL) == -1) {
+            perror("epoll_ctl: remove connection");
+          }
+          close(conn_fd);
         }
       }
     }

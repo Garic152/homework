@@ -2,6 +2,10 @@ cmake_minimum_required (VERSION 3.5)
 project (RN-Praxis)
 set (CMAKE_C_STANDARD 11)
 
+# Debugging
+# set(CMAKE_BUILD_TYPE Debug)
+# add_compile_options(-g -O0)
+
 find_package(OpenSSL REQUIRED)
 
 add_executable (webserver webserver.c http.c util.c data.c hashing.c)
