@@ -29,8 +29,10 @@ struct tuple resources[MAX_RESOURCES] = {
 
 typedef struct {
   uint32_t id;
-  struct in_addr ip;
-  uint16_t port;
+  // struct in_addr ip;
+  const char *ip;
+  // uint16_t port;
+  const char *port;
   struct tuple resources[50];
 } DHT;
 
@@ -310,73 +312,89 @@ static int setup_server_socket(struct sockaddr_in addr, int is_udp) {
  *  ./build/webserver self.ip self.port self.id
  */
 int main(int argc, char **argv) {
-  // if (argc != 4) {
-  //   return EXIT_FAILURE;
-  // }
+  if (argc < 3) {
+    return EXIT_FAILURE;
+  }
+  const int MAX_NODES = 2;
+  DHT_NODE nodes[MAX_NODES];
 
   if (argc == 4) {
-    const int MAX_NODES = 2;
-    DHT_NODE nodes[MAX_NODES];
+    // temp vars
+    const char *pred_port_str = getenv("PRED_PORT");
+    const char *succ_port_str = getenv("SUCC_PORT");
 
     // parse env variables into DHT_NODE
-    nodes[0].predecessor.id = (uint32_t)atoi(argv[3]);
-    inet_pton(AF_INET, getenv("PRED_IP"), &nodes[0].predecessor.ip);
-    nodes[0].predecessor.port = (uint32_t)atoi(argv[2]);
+    // nodes[0].predecessor.id = (uint32_t)atoi(argv[3]);
+    // inet_pton(AF_INET, getenv("PRED_IP"), &nodes[0].predecessor.ip);
+    // nodes[0].predecessor.port = (uint32_t)atoi(argv[2]);
 
-    nodes[0].current.id = (uint32_t)atoi(getenv("PRED_ID"));
-    inet_pton(AF_INET, getenv("PRED_IP"), &nodes[0].current.ip);
-    nodes[0].current.port = (uint16_t)atoi(getenv("PRED_PORT"));
+    // nodes[0].current.id = (uint32_t)atoi(getenv("PRED_ID"));
+    // inet_pton(AF_INET, getenv("PRED_IP"), &nodes[0].current.ip);
+    // nodes[0].current.port = (uint16_t)atoi(getenv("PRED_PORT"));
 
-    nodes[0].successor.id = (uint32_t)atoi(argv[3]);
-    inet_pton(AF_INET, getenv("PRED_IP"), &nodes[0].successor.ip);
-    nodes[0].successor.port = (uint32_t)atoi(argv[2]);
+    // nodes[0].successor.id = (uint32_t)atoi(argv[3]);
+    // inet_pton(AF_INET, getenv("PRED_IP"), &nodes[0].successor.ip);
+    // nodes[0].successor.port = (uint32_t)atoi(argv[2]);
 
-    nodes[1].predecessor.id = (uint32_t)atoi(getenv("PRED_ID"));
-    inet_pton(AF_INET, getenv("PRED_IP"), &nodes[1].predecessor.ip);
-    nodes[1].predecessor.port = (uint16_t)atoi(getenv("PRED_PORT"));
+    // nodes[1].predecessor.id = (uint32_t)atoi(getenv("PRED_ID"));
+    // inet_pton(AF_INET, getenv("PRED_IP"), &nodes[1].predecessor.ip);
+    // nodes[1].predecessor.port = (uint16_t)atoi(getenv("PRED_PORT"));
 
-    nodes[1].current.id = (uint32_t)atoi(argv[3]);
-    inet_pton(AF_INET, getenv("PRED_IP"), &nodes[1].current.ip);
-    nodes[1].current.port = (uint16_t)atoi(argv[2]);
+    // nodes[1].current.id = (uint32_t)atoi(argv[3]);
+    // inet_pton(AF_INET, getenv("PRED_IP"), &nodes[1].current.ip);
+    // nodes[1].current.port = (uint16_t)atoi(argv[2]);
 
-    nodes[1].successor.id = (uint32_t)atoi(getenv("SUCC_ID"));
-    inet_pton(AF_INET, getenv("SUCC_IP"), &nodes[1].successor.ip);
-    nodes[1].successor.port = (uint16_t)atoi(getenv("SUCC_PORT"));
+    // nodes[1].successor.id = (uint32_t)atoi(getenv("SUCC_ID"));
+    // inet_pton(AF_INET, getenv("SUCC_IP"), &nodes[1].successor.ip);
+    // nodes[1].successor.port = (uint16_t)atoi(getenv("SUCC_PORT"));
+    nodes[0].current.port = argv[2];
+    nodes[1].current.port = succ_port_str;
   }
 
-  struct sockaddr_in addr = derive_sockaddr(argv[1], argv[2]);
-
   // Initialize epoll()
+  struct epoll_event ev, events[EPOLL_MAX_EVENTS];
+
   int epoll_fd = epoll_create1(0);
   if (epoll_fd == 1) {
     perror("epoll");
     return 1;
   }
 
-  // Set up a TCP server socket.
-  int tcp_server_socket = setup_server_socket(addr, 0);
+  int *server_sockets = malloc(MAX_NODES * 2 * sizeof(int));
 
-  // Set up a UDP server socket.
-  int udp_server_socket = setup_server_socket(addr, 1);
-
-  struct epoll_event ev;
-  ev.events = EPOLLIN;
-
-  ev.data.fd = tcp_server_socket;
-  if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, tcp_server_socket, &ev) == -1) {
-    perror("epoll_ctl: tcp_server_socket");
+  if (!server_sockets) {
+    perror("malloc");
     exit(EXIT_FAILURE);
   }
 
-  ev.data.fd = udp_server_socket;
-  if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, udp_server_socket, &ev) == -1) {
-    perror("epoll_ctl: udp_server_socket");
-    exit(EXIT_FAILURE);
+  for (int i = 0; i <= MAX_NODES; i++) {
+    struct sockaddr_in addr = derive_sockaddr(argv[1], nodes[i].current.port);
+
+    // Set up a TCP server socket.
+    int tcp_server_socket = setup_server_socket(addr, 0);
+
+    // Set up a UDP server socket.
+    int udp_server_socket = setup_server_socket(addr, 1);
+
+    server_sockets[i * 2] = tcp_server_socket;
+    server_sockets[i * 2 + 1] = udp_server_socket;
+
+    ev.events = EPOLLIN;
+
+    ev.data.fd = tcp_server_socket;
+    if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, tcp_server_socket, &ev) == -1) {
+      perror("epoll_ctl: tcp_server_socket");
+      exit(EXIT_FAILURE);
+    }
+
+    ev.data.fd = udp_server_socket;
+    if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, udp_server_socket, &ev) == -1) {
+      perror("epoll_ctl: udp_server_socket");
+      exit(EXIT_FAILURE);
+    }
   }
 
   struct connection_state state = {0};
-
-  struct epoll_event events[EPOLL_MAX_EVENTS];
 
   while (true) {
 
@@ -389,13 +407,29 @@ int main(int argc, char **argv) {
 
     // Process events on the monitored sockets.
     for (int i = 0; i < n; i++) {
+      int current_fd = events[i].data.fd;
+
+      bool is_tcp_socket = false;
+      bool is_udp_socket = false;
+
+      for (int j = 0; j < MAX_NODES * 2; j++) {
+        if (server_sockets[j] == current_fd) {
+          if (j % 2 == 0) {
+            is_tcp_socket = true;
+          } else {
+            is_udp_socket = true;
+          }
+          break;
+        }
+      }
+
       // Check if current connection is tcp
-      if (events[i].data.fd == tcp_server_socket) {
+      if (is_tcp_socket) {
         // If the event is on the server_socket, accept a new connection from a
         // client.
-        int connection = accept(tcp_server_socket, NULL, NULL);
+        int connection = accept(current_fd, NULL, NULL);
         if (connection == -1 && errno != EAGAIN && errno != EWOULDBLOCK) {
-          close(tcp_server_socket);
+          close(current_fd);
           perror("accept");
           exit(EXIT_FAILURE);
         } // else {
@@ -408,13 +442,13 @@ int main(int argc, char **argv) {
           close(connection);
         }
         // else handle data from udp
-      } else if (events[i].data.fd == udp_server_socket) {
+      } else if (is_udp_socket) {
         char buffer[BUFLEN];
         struct sockaddr_in sender_addr;
         socklen_t sender_addr_len = sizeof(sender_addr);
 
         int received_bytes =
-            recvfrom(udp_server_socket, buffer, BUFLEN, 0,
+            recvfrom(current_fd, buffer, BUFLEN, 0,
                      (struct sockaddr *)&sender_addr, &sender_addr_len);
         if (received_bytes == -1) {
           perror("recfrom");
