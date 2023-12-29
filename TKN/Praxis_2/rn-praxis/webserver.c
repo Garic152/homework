@@ -61,7 +61,7 @@ void initialize_node(DHT_NODE *node) {
  * @param request   A pointer to the struct containing the parsed request
  * information.
  */
-void send_reply(int conn, struct request *request) {
+void send_reply(int conn, struct request *request, DHT_NODE *node) {
 
   // Create a buffer to hold the HTTP reply
   char buffer[HTTP_MAX_SIZE];
@@ -70,7 +70,17 @@ void send_reply(int conn, struct request *request) {
   fprintf(stderr, "Handling %s request for %s (%lu byte payload)\n",
           request->method, request->uri, request->payload_length);
 
-  if (strcmp(request->method, "GET") == 0) {
+  if (atoi(request->uri) < node->current.id) {
+    size_t resource_length;
+    const char *resource =
+        get(request->uri, resources, MAX_RESOURCES, &resource_length);
+
+    sprintf(reply,
+            "HTTP/1.1 303 See "
+            "Other\r\nLocation:http://%s:%d/%s\r\nContent-Length: %lu\r\n\r\n",
+            node->predecessor.ip, atoi(node->predecessor.port), request->uri,
+            resource_length);
+  } else if (strcmp(request->method, "GET") == 0) {
     // Find the resource with the given URI in the 'resources' array.
     size_t resource_length;
     const char *resource =
@@ -122,13 +132,13 @@ void send_reply(int conn, struct request *request) {
  * malformed or an error occurs during processing, the return value is -1.
  *
  */
-size_t process_packet(int conn, char *buffer, size_t n) {
+size_t process_packet(int conn, char *buffer, size_t n, DHT_NODE node) {
   struct request request = {
       .method = NULL, .uri = NULL, .payload = NULL, .payload_length = -1};
   ssize_t bytes_processed = parse_request(buffer, n, &request);
 
   if (bytes_processed > 0) {
-    send_reply(conn, &request);
+    send_reply(conn, &request, &node);
 
     // Check the "Connection" header in the request to determine if the
     // connection should be kept alive or closed.
@@ -196,7 +206,7 @@ char *buffer_discard(char *buffer, size_t discard, size_t keep) {
  * false otherwise. If an error occurs while receiving data from the socket, the
  * function exits the program.
  */
-bool handle_connection(struct connection_state *state) {
+bool handle_connection(struct connection_state *state, DHT_NODE *node) {
   // Calculate the pointer to the end of the buffer to avoid buffer overflow
   const char *buffer_end = state->buffer + HTTP_MAX_SIZE;
 
@@ -216,7 +226,8 @@ bool handle_connection(struct connection_state *state) {
 
   ssize_t bytes_processed = 0;
   while ((bytes_processed = process_packet(state->sock, window_start,
-                                           window_end - window_start)) > 0) {
+                                           window_end - window_start, *node)) >
+         0) {
     window_start += bytes_processed;
   }
   if (bytes_processed == -1) {
@@ -319,7 +330,7 @@ static int setup_server_socket(struct sockaddr_in addr, int is_udp) {
 void parse_arguments(int argc, char *argv[], DHT_NODE *node) {
   node->current.ip = argv[1];
   node->current.port = argv[2];
-  if (argc == 3) {
+  if (argc == 4) {
     node->current.id = atoi(argv[3]);
   }
 }
@@ -455,7 +466,7 @@ int main(int argc, char **argv) {
 
         // Call the 'handle_connection' function to process the incoming data on
         // the socket.
-        bool cont = handle_connection(&state);
+        bool cont = handle_connection(&state, &nodes[0]);
         if (!cont) { // get ready for a new connection
           if (epoll_ctl(epoll_fd, EPOLL_CTL_DEL, conn_fd, NULL) == -1) {
             perror("epoll_ctl: remove connection");
