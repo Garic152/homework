@@ -42,6 +42,18 @@ typedef struct {
   DHT successor;
 } DHT_NODE;
 
+void initialize_node(DHT_NODE *node) {
+  // Read predecessor info from evnironment variables
+  node->predecessor.id = atoi(getenv("PRED_ID"));
+  node->predecessor.ip = getenv("PRED_IP");
+  node->predecessor.port = getenv("PRED_PORT");
+
+  // Read successor info from environment variables
+  node->successor.id = atoi(getenv("SUCC_ID"));
+  node->successor.ip = getenv("SUCC_IP");
+  node->successor.port = getenv("SUCC_PORT");
+}
+
 /**
  * Sends an HTTP reply to the client based on the received request.
  *
@@ -304,6 +316,14 @@ static int setup_server_socket(struct sockaddr_in addr, int is_udp) {
   return sock;
 }
 
+void parse_arguments(int argc, char *argv[], DHT_NODE *node) {
+  node->current.ip = argv[1];
+  node->current.port = argv[2];
+  if (argc == 3) {
+    node->current.id = atoi(argv[3]);
+  }
+}
+
 /**
  *  The program expects 5; otherwise, it returns EXIT_FAILURE.
  *
@@ -315,40 +335,15 @@ int main(int argc, char **argv) {
   if (argc < 3) {
     return EXIT_FAILURE;
   }
-  const int MAX_NODES = 2;
+
+  const int MAX_NODES = 1;
   DHT_NODE nodes[MAX_NODES];
 
-  if (argc == 4) {
-    // temp vars
-    const char *pred_port_str = getenv("PRED_PORT");
-    const char *succ_port_str = getenv("SUCC_PORT");
-
-    // parse env variables into DHT_NODE
-    // nodes[0].predecessor.id = (uint32_t)atoi(argv[3]);
-    // inet_pton(AF_INET, getenv("PRED_IP"), &nodes[0].predecessor.ip);
-    // nodes[0].predecessor.port = (uint32_t)atoi(argv[2]);
-
-    // nodes[0].current.id = (uint32_t)atoi(getenv("PRED_ID"));
-    // inet_pton(AF_INET, getenv("PRED_IP"), &nodes[0].current.ip);
-    // nodes[0].current.port = (uint16_t)atoi(getenv("PRED_PORT"));
-
-    // nodes[0].successor.id = (uint32_t)atoi(argv[3]);
-    // inet_pton(AF_INET, getenv("PRED_IP"), &nodes[0].successor.ip);
-    // nodes[0].successor.port = (uint32_t)atoi(argv[2]);
-
-    // nodes[1].predecessor.id = (uint32_t)atoi(getenv("PRED_ID"));
-    // inet_pton(AF_INET, getenv("PRED_IP"), &nodes[1].predecessor.ip);
-    // nodes[1].predecessor.port = (uint16_t)atoi(getenv("PRED_PORT"));
-
-    // nodes[1].current.id = (uint32_t)atoi(argv[3]);
-    // inet_pton(AF_INET, getenv("PRED_IP"), &nodes[1].current.ip);
-    // nodes[1].current.port = (uint16_t)atoi(argv[2]);
-
-    // nodes[1].successor.id = (uint32_t)atoi(getenv("SUCC_ID"));
-    // inet_pton(AF_INET, getenv("SUCC_IP"), &nodes[1].successor.ip);
-    // nodes[1].successor.port = (uint16_t)atoi(getenv("SUCC_PORT"));
-    nodes[0].current.port = argv[2];
-    nodes[1].current.port = succ_port_str;
+  if (argc == 3) {
+    parse_arguments(argc, argv, &nodes[0]);
+  } else if (argc == 4) {
+    initialize_node(&nodes[0]);
+    parse_arguments(argc, argv, &nodes[0]);
   }
 
   // Initialize epoll()
