@@ -11,11 +11,10 @@ uint16_t hash(const char *str) {
   return htons(*((uint32_t *)digest));
 }
 
-bool is_responsible(uint32_t *current_id, uint32_t *successor_id,
-                    uint32_t *hash) {
-  if (*current_id > *successor_id) {
-    return *hash<*current_id && * hash> * successor_id;
+bool is_responsible(uint32_t current_id, uint32_t successor_id, uint32_t hash) {
+  if (current_id > successor_id) {
+    return hash < current_id && hash > successor_id;
   } else {
-    return *hash < *current_id || *hash > *successor_id;
+    return hash < current_id || hash > successor_id;
   }
 }
