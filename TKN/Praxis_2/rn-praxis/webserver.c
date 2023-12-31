@@ -15,6 +15,7 @@
 #include <unistd.h>
 
 #include "data.h"
+#include "hashing.h"
 #include "http.h"
 #include "util.h"
 
@@ -70,46 +71,48 @@ void send_reply(int conn, struct request *request, DHT_NODE *node) {
   fprintf(stderr, "Handling %s request for %s (%lu byte payload)\n",
           request->method, request->uri, request->payload_length);
 
-  if (atoi(request->uri) < node->current.id) {
+  if (is_responsible(&node->current.id, &node->successor.id, &request->hash)) {
+    if (strcmp(request->method, "GET") == 0) {
+      // Find the resource with the given URI in the 'resources' array.
+      size_t resource_length;
+      const char *resource =
+          get(request->uri, resources, MAX_RESOURCES, &resource_length);
+
+      if (resource) {
+        sprintf(reply, "HTTP/1.1 200 OK\r\nContent-Length: %lu\r\n\r\n%.*s",
+                resource_length, (int)resource_length, resource);
+      } else {
+        reply = "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\n\r\n";
+      }
+    } else if (strcmp(request->method, "PUT") == 0) {
+      // Try to set the requested resource with the given payload in the
+      // 'resources' array.
+      if (set(request->uri, request->payload, request->payload_length,
+              resources, MAX_RESOURCES)) {
+        reply = "HTTP/1.1 204 No Content\r\n\r\n";
+      } else {
+        reply = "HTTP/1.1 201 Created\r\nContent-Length: 0\r\n\r\n";
+      }
+    } else if (strcmp(request->method, "DELETE") == 0) {
+      // Try to delete the requested resource from the 'resources' array
+      if (delete (request->uri, resources, MAX_RESOURCES)) {
+        reply = "HTTP/1.1 204 No Content\r\n\r\n";
+      } else {
+        reply = "HTTP/1.1 404 Not Found\r\n\r\n";
+      }
+    } else {
+      reply = "HTTP/1.1 501 Method Not Supported\r\n\r\n";
+    }
+  } else {
     size_t resource_length;
     const char *resource =
         get(request->uri, resources, MAX_RESOURCES, &resource_length);
 
     sprintf(reply,
             "HTTP/1.1 303 See "
-            "Other\r\nLocation:http://%s:%d/%s\r\nContent-Length: %lu\r\n\r\n",
+            "Other\r\nLocation:http://%s:%d%s\r\nContent-Length: %lu\r\n\r\n",
             node->predecessor.ip, atoi(node->predecessor.port), request->uri,
             resource_length);
-  } else if (strcmp(request->method, "GET") == 0) {
-    // Find the resource with the given URI in the 'resources' array.
-    size_t resource_length;
-    const char *resource =
-        get(request->uri, resources, MAX_RESOURCES, &resource_length);
-
-    if (resource) {
-      sprintf(reply, "HTTP/1.1 200 OK\r\nContent-Length: %lu\r\n\r\n%.*s",
-              resource_length, (int)resource_length, resource);
-    } else {
-      reply = "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\n\r\n";
-    }
-  } else if (strcmp(request->method, "PUT") == 0) {
-    // Try to set the requested resource with the given payload in the
-    // 'resources' array.
-    if (set(request->uri, request->payload, request->payload_length, resources,
-            MAX_RESOURCES)) {
-      reply = "HTTP/1.1 204 No Content\r\n\r\n";
-    } else {
-      reply = "HTTP/1.1 201 Created\r\nContent-Length: 0\r\n\r\n";
-    }
-  } else if (strcmp(request->method, "DELETE") == 0) {
-    // Try to delete the requested resource from the 'resources' array
-    if (delete (request->uri, resources, MAX_RESOURCES)) {
-      reply = "HTTP/1.1 204 No Content\r\n\r\n";
-    } else {
-      reply = "HTTP/1.1 404 Not Found\r\n\r\n";
-    }
-  } else {
-    reply = "HTTP/1.1 501 Method Not Supported\r\n\r\n";
   }
 
   // Send the reply back to the client
