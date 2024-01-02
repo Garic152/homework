@@ -14,8 +14,8 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include "DHT.h"
 #include "data.h"
-#include "hashing.h"
 #include "http.h"
 #include "util.h"
 
@@ -70,6 +70,14 @@ void send_reply(int conn, struct request *request, DHT_NODE *node) {
 
   fprintf(stderr, "Handling %s request for %s (%lu byte payload)\n",
           request->method, request->uri, request->payload_length);
+
+  struct LookupMessage message = {.message_type = 0,
+                                  .hash_id = request->hash,
+                                  .node_id = node->predecessor.id,
+                                  .node_ip = node->predecessor.ip,
+                                  .node_port = atoi(node->predecessor.port)};
+
+  send_lookup(message);
 
   if (is_responsible(node->current.id, node->successor.id, request->hash)) {
     if (strcmp(request->method, "GET") == 0) {
@@ -461,6 +469,18 @@ int main(int argc, char **argv) {
                      (struct sockaddr *)&sender_addr, &sender_addr_len);
         if (received_bytes == -1) {
           perror("recfrom");
+        } else if (received_bytes == sizeof(struct LookupMessage)) {
+          struct LookupMessage *message = (struct LookupMessage *)buffer;
+
+          // Convert received message from network byte order to host byte order
+          message->message_type = ntohl(message->message_type);
+          message->hash_id = ntohl(message->hash_id);
+          message->node_id = ntohl(message->node_id);
+          message->node_port = ntohs(message->node_port);
+
+          // Handle IP adress
+          char ipStr[32];
+          inet_ntop(AF_INET, &(message->node_ip), ipStr, 32);
         }
       } else {
         int conn_fd = events[i].data.fd;

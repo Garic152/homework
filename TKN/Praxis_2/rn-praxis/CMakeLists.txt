@@ -8,7 +8,7 @@ set (CMAKE_C_STANDARD 11)
 
 find_package(OpenSSL REQUIRED)
 
-add_executable (webserver webserver.c http.c util.c data.c hashing.c)
+add_executable (webserver webserver.c http.c util.c data.c DHT.c)
 target_compile_options (webserver PRIVATE -Wall -Wextra -Wpedantic)
 target_link_libraries(webserver PRIVATE -lm OpenSSL::SSL OpenSSL::Crypto)
 
