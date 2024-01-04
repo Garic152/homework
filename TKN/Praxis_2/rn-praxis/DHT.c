@@ -22,7 +22,7 @@ bool is_responsible(uint32_t current_id, uint32_t successor_id, uint32_t hash) {
   }
 }
 
-int send_lookup(struct LookupMessage message) {
+int send_lookup(struct LookupMessage message, struct Destination destination) {
   int sockfd;
   struct sockaddr_in nodeAddr;
 
@@ -34,8 +34,13 @@ int send_lookup(struct LookupMessage message) {
 
   memset(&nodeAddr, 0, sizeof(nodeAddr));
   nodeAddr.sin_family = AF_INET;
-  nodeAddr.sin_port = htons(message.node_port);
-  nodeAddr.sin_addr.s_addr = inet_addr(message.node_ip);
+  nodeAddr.sin_port = htons(destination.node_port);
+  nodeAddr.sin_addr.s_addr = destination.node_ip;
+
+  message.message_type = htonl(message.message_type);
+  message.hash_id = htonl(message.hash_id);
+  message.node_id = htonl(message.node_id);
+  message.node_port = htonl(message.node_port);
 
   if (sendto(sockfd, &message, sizeof(message), 0, (struct sockaddr *)&nodeAddr,
              sizeof(nodeAddr)) < 0) {

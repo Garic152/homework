@@ -71,13 +71,18 @@ void send_reply(int conn, struct request *request, DHT_NODE *node) {
   fprintf(stderr, "Handling %s request for %s (%lu byte payload)\n",
           request->method, request->uri, request->payload_length);
 
+  // Copy lookup information into message struct
   struct LookupMessage message = {.message_type = 0,
                                   .hash_id = request->hash,
-                                  .node_id = node->predecessor.id,
-                                  .node_ip = node->predecessor.ip,
-                                  .node_port = atoi(node->predecessor.port)};
+                                  .node_id = node->current.id,
+                                  .node_ip = inet_addr(node->current.ip),
+                                  .node_port = atoi(node->current.port)};
 
-  send_lookup(message);
+  // Copy destination node into Destination struct
+  struct Destination destination = {.node_ip = inet_addr(node->successor.ip),
+                                    .node_port = atoi(node->successor.port)};
+
+  send_lookup(message, destination);
 
   if (is_responsible(node->current.id, node->successor.id, request->hash)) {
     if (strcmp(request->method, "GET") == 0) {
@@ -481,6 +486,7 @@ int main(int argc, char **argv) {
           // Handle IP adress
           char ipStr[32];
           inet_ntop(AF_INET, &(message->node_ip), ipStr, 32);
+          printf("nothing");
         }
       } else {
         int conn_fd = events[i].data.fd;
