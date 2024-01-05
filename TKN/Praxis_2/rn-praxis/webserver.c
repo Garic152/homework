@@ -17,6 +17,7 @@
 #include "DHT.h"
 #include "data.h"
 #include "http.h"
+#include "structures.h"
 #include "util.h"
 
 #define MAX_RESOURCES 100
@@ -27,21 +28,6 @@ struct tuple resources[MAX_RESOURCES] = {
     {"/static/foo", "Foo", sizeof "Foo" - 1},
     {"/static/bar", "Bar", sizeof "Bar" - 1},
     {"/static/baz", "Baz", sizeof "Baz" - 1}};
-
-typedef struct {
-  uint32_t id;
-  // struct in_addr ip;
-  const char *ip;
-  // uint16_t port;
-  const char *port;
-  struct tuple resources[50];
-} DHT;
-
-typedef struct {
-  DHT predecessor;
-  DHT current;
-  DHT successor;
-} DHT_NODE;
 
 void initialize_node(DHT_NODE *node) {
   // Read predecessor info from evnironment variables
@@ -486,7 +472,8 @@ int main(int argc, char **argv) {
           // Handle IP adress
           char ipStr[32];
           inet_ntop(AF_INET, &(message->node_ip), ipStr, 32);
-          printf("nothing");
+
+          receive_lookup(message, &nodes[0]);
         }
       } else {
         int conn_fd = events[i].data.fd;
