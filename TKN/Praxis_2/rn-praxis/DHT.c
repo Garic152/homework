@@ -97,6 +97,7 @@ int receive_lookup(struct LookupMessage *message, DHT_NODE *node, int sockfd) {
     return 1;
   } else {
     // Node is not responsible, send information to next node
+    destination.node_ip = inet_addr(node->successor.ip);
     destination.node_port = atoi(node->successor.port);
     if (send_message(*message, destination, sockfd) < 0) {
       return -1;
