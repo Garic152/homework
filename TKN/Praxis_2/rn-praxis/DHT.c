@@ -23,15 +23,9 @@ bool is_responsible(uint32_t current_id, uint32_t successor_id, uint32_t hash) {
   }
 }
 
-int send_message(struct LookupMessage message, struct Destination destination) {
+int send_message(struct LookupMessage message, struct Destination destination,
+                 int sockfd) {
   struct sockaddr_in nodeAddr;
-  int sockfd;
-
-  sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-  if (sockfd < 0) {
-    perror("Socket error");
-    return -1;
-  }
 
   // Set necessary information for sendto()
   memset(&nodeAddr, 0, sizeof(nodeAddr));
@@ -51,23 +45,23 @@ int send_message(struct LookupMessage message, struct Destination destination) {
     close(sockfd);
     return -1;
   }
-  close(sockfd);
   return 0;
 }
 
-int send_lookup(struct LookupMessage message, struct Destination destination) {
+int send_lookup(struct LookupMessage message, struct Destination destination,
+                int sockfd) {
   struct sockaddr_in nodeAddr;
   struct LookupMessage reply;
-  int sockfd;
+
   socklen_t addr_len = sizeof(nodeAddr);
 
-  sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-  if (sockfd < 0) {
-    perror("Socket error");
-    return -1;
-  }
+  // Set necessary information for receive()
+  memset(&nodeAddr, 0, sizeof(nodeAddr));
+  nodeAddr.sin_family = AF_INET;
+  nodeAddr.sin_port = htons(message.node_port);
+  nodeAddr.sin_addr.s_addr = message.node_ip;
 
-  if (send_message(message, destination) < 0) {
+  if (send_message(message, destination, sockfd) < 0) {
     close(sockfd);
     return -1;
   }
@@ -83,7 +77,7 @@ int send_lookup(struct LookupMessage message, struct Destination destination) {
   return 0;
 }
 
-int receive_lookup(struct LookupMessage *message, DHT_NODE *node) {
+int receive_lookup(struct LookupMessage *message, DHT_NODE *node, int sockfd) {
   struct Destination destination;
 
   if (message->hash_id < node->current.id) {
@@ -97,14 +91,14 @@ int receive_lookup(struct LookupMessage *message, DHT_NODE *node) {
     message->node_port = atoi(node->current.port);
     message->node_ip = inet_addr(node->current.ip);
 
-    if (send_message(*message, destination) < 0) {
+    if (send_message(*message, destination, sockfd) < 0) {
       return -1;
     }
     return 1;
   } else {
     // Node is not responsible, send information to next node
     destination.node_port = atoi(node->successor.port);
-    if (send_message(*message, destination) < 0) {
+    if (send_message(*message, destination, sockfd) < 0) {
       return -1;
     }
     return 1;

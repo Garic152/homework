@@ -24,6 +24,9 @@
 #define BUFLEN 512
 #define EPOLL_MAX_EVENTS 10
 
+// Temporarely define UDP socket globally
+int udp_socket = -1;
+
 struct tuple resources[MAX_RESOURCES] = {
     {"/static/foo", "Foo", sizeof "Foo" - 1},
     {"/static/bar", "Bar", sizeof "Bar" - 1},
@@ -68,7 +71,7 @@ void send_reply(int conn, struct request *request, DHT_NODE *node) {
   struct Destination destination = {.node_ip = inet_addr(node->successor.ip),
                                     .node_port = atoi(node->successor.port)};
 
-  send_lookup(message, destination);
+  send_lookup(message, destination, udp_socket);
 
   if (is_responsible(node->current.id, node->successor.id, request->hash)) {
     if (strcmp(request->method, "GET") == 0) {
@@ -383,6 +386,8 @@ int main(int argc, char **argv) {
 
     // Set up a UDP server socket.
     int udp_server_socket = setup_server_socket(addr, 1);
+    // Temporarely pass the UDP socket into global var
+    udp_socket = udp_server_socket;
 
     server_sockets[i * 2] = tcp_server_socket;
     server_sockets[i * 2 + 1] = udp_server_socket;
@@ -473,7 +478,7 @@ int main(int argc, char **argv) {
           char ipStr[32];
           inet_ntop(AF_INET, &(message->node_ip), ipStr, 32);
 
-          receive_lookup(message, &nodes[0]);
+          receive_lookup(message, &nodes[0], udp_socket);
         }
       } else {
         int conn_fd = events[i].data.fd;
