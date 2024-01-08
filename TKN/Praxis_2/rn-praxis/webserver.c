@@ -314,11 +314,19 @@ static int setup_server_socket(struct sockaddr_in addr, int is_udp) {
   }
 
   // Bind socket to the provided address
-  if (bind(sock, (struct sockaddr *)&addr, sizeof(addr)) == -1) {
+  if (bind(sock, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
     perror("bind");
     close(sock);
     exit(EXIT_FAILURE);
   }
+
+  uint namelen = sizeof(addr);
+  if (getsockname(sock, (struct sockaddr *)&addr, &namelen) < 0) {
+    perror("getsockname()");
+    exit(3);
+  }
+
+  printf("Port assigned is %d\n", ntohs(addr.sin_port));
 
   if (!is_udp) {
     // Start listening on the socket with maximum backlog of 1 pending
@@ -378,7 +386,7 @@ int main(int argc, char **argv) {
     exit(EXIT_FAILURE);
   }
 
-  for (int i = 0; i <= MAX_NODES; i++) {
+  for (int i = 0; i < MAX_NODES; i++) {
     struct sockaddr_in addr = derive_sockaddr(argv[1], nodes[i].current.port);
 
     // Set up a TCP server socket.
@@ -478,7 +486,7 @@ int main(int argc, char **argv) {
           char ipStr[32];
           inet_ntop(AF_INET, &(message->node_ip), ipStr, 32);
 
-          receive_lookup(message, &nodes[0], udp_socket);
+          receive_lookup(message, &nodes[0], events[i].data.fd);
         }
       } else {
         int conn_fd = events[i].data.fd;

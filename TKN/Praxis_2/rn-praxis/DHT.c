@@ -50,10 +50,11 @@ int send_message(struct LookupMessage message, struct Destination destination,
 
 int send_lookup(struct LookupMessage message, struct Destination destination,
                 int sockfd) {
-  struct sockaddr_in nodeAddr;
   struct LookupMessage reply;
-
+  struct sockaddr_in nodeAddr;
   socklen_t addr_len = sizeof(nodeAddr);
+
+  char buffer[1024];
 
   // Set necessary information for receive()
   memset(&nodeAddr, 0, sizeof(nodeAddr));
@@ -67,14 +68,30 @@ int send_lookup(struct LookupMessage message, struct Destination destination,
   }
 
   // Wait for reply
-  if (recvfrom(sockfd, &reply, sizeof(reply), 0, (struct sockaddr *)&nodeAddr,
-               &addr_len) < 0) {
-    perror("Recvfrom error");
+  int received_bytes = recvfrom(sockfd, buffer, 1024, 0,
+                                (struct sockaddr *)&nodeAddr, &addr_len);
+  if (received_bytes == -1) {
+    perror("recfrom");
     close(sockfd);
     return -1;
+  } else if (received_bytes == sizeof(struct LookupMessage)) {
+    struct LookupMessage *message = (struct LookupMessage *)buffer;
+
+    // Convert received message from network byte order to host byte order
+    message->message_type = ntohl(message->message_type);
+    message->hash_id = ntohl(message->hash_id);
+    message->node_id = ntohl(message->node_id);
+    message->node_port = ntohs(message->node_port);
+
+    // Handle IP adress
+    char ipStr[32];
+    inet_ntop(AF_INET, &(message->node_ip), ipStr, 32);
+
+    close(sockfd);
+    return 0;
   }
   close(sockfd);
-  return 0;
+  return -1;
 }
 
 int receive_lookup(struct LookupMessage *message, DHT_NODE *node, int sockfd) {
