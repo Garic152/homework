@@ -21,7 +21,7 @@ struct Destination {
 
 uint16_t hash(const char *str);
 bool is_responsible(uint32_t current_id, uint32_t successor_id, uint32_t hash);
-int send_lookup(struct LookupMessage message, struct Destination destination,
+int send_lookup(struct LookupMessage *message, struct Destination destination,
                 int sockfd);
 int receive_lookup(struct LookupMessage *message, DHT_NODE *node, int sockfd);
 

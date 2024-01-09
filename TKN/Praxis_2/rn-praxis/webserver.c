@@ -60,19 +60,6 @@ void send_reply(int conn, struct request *request, DHT_NODE *node) {
   fprintf(stderr, "Handling %s request for %s (%lu byte payload)\n",
           request->method, request->uri, request->payload_length);
 
-  // Copy lookup information into message struct
-  struct LookupMessage message = {.message_type = 0,
-                                  .hash_id = request->hash,
-                                  .node_id = node->current.id,
-                                  .node_ip = inet_addr(node->current.ip),
-                                  .node_port = atoi(node->current.port)};
-
-  // Copy destination node into Destination struct
-  struct Destination destination = {.node_ip = inet_addr(node->successor.ip),
-                                    .node_port = atoi(node->successor.port)};
-
-  send_lookup(message, destination, udp_socket);
-
   if (is_responsible(node->current.id, node->successor.id, request->hash)) {
     if (strcmp(request->method, "GET") == 0) {
       // Find the resource with the given URI in the 'resources' array.
@@ -106,15 +93,33 @@ void send_reply(int conn, struct request *request, DHT_NODE *node) {
       reply = "HTTP/1.1 501 Method Not Supported\r\n\r\n";
     }
   } else {
-    size_t resource_length;
-    const char *resource =
-        get(request->uri, resources, MAX_RESOURCES, &resource_length);
+    // Copy lookup information into message struct
+    struct LookupMessage message = {.message_type = 0,
+                                    .hash_id = request->hash,
+                                    .node_id = node->current.id,
+                                    .node_ip = inet_addr(node->current.ip),
+                                    .node_port = atoi(node->current.port)};
 
-    sprintf(reply,
-            "HTTP/1.1 303 See "
-            "Other\r\nLocation:http://%s:%d%s\r\nContent-Length: %lu\r\n\r\n",
-            node->predecessor.ip, atoi(node->predecessor.port), request->uri,
-            resource_length);
+    // Copy destination node into Destination struct
+    struct Destination destination = {.node_ip = inet_addr(node->successor.ip),
+                                      .node_port = atoi(node->successor.port)};
+
+    if ((send_lookup(&message, destination, udp_socket)) < 0) {
+      perror("Send lookup");
+    } else {
+      // Handle IP adress
+      char ip_str[32];
+      inet_ntop(AF_INET, &(message.node_ip), ip_str, 32);
+
+      size_t resource_length;
+      const char *resource =
+          get(request->uri, resources, MAX_RESOURCES, &resource_length);
+
+      sprintf(reply,
+              "HTTP/1.1 303 See "
+              "Other\r\nLocation:http://%s:%d%s\r\nContent-Length: %lu\r\n\r\n",
+              ip_str, message.node_port, request->uri, resource_length);
+    }
   }
 
   // Send the reply back to the client
@@ -326,7 +331,7 @@ static int setup_server_socket(struct sockaddr_in addr, int is_udp) {
     exit(3);
   }
 
-  printf("Port assigned is %d\n", ntohs(addr.sin_port));
+  printf("Port %d is assigned to %d\n", ntohs(addr.sin_port), sock);
 
   if (!is_udp) {
     // Start listening on the socket with maximum backlog of 1 pending
