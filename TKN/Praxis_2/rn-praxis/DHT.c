@@ -9,12 +9,14 @@
 
 #include "DHT.h"
 
+// Simple Sha256 hash function
 uint16_t hash(const char *str) {
   uint8_t digest[SHA256_DIGEST_LENGTH];
   SHA256((uint8_t *)str, strlen(str), digest);
   return htons(*((uint32_t *)digest));
 }
 
+// Check if the given hash lies within responsibility of the two IDs
 bool is_responsible(uint32_t current_id, uint32_t successor_id, uint32_t hash) {
   if (current_id > successor_id) {
     return hash < current_id && hash > successor_id;
@@ -23,6 +25,7 @@ bool is_responsible(uint32_t current_id, uint32_t successor_id, uint32_t hash) {
   }
 }
 
+// Send `LoopupMessage` to destination using socket.
 int send_message(struct LookupMessage *message, struct Destination destination,
                  int sockfd) {
   struct sockaddr_in nodeAddr;
@@ -49,6 +52,8 @@ int send_message(struct LookupMessage *message, struct Destination destination,
   return 0;
 }
 
+// Similar to send_message, it sends a `LookupMessage` to destination using socket,
+// however it waits for a reply from destination and closes the socket upon successful reply.
 int send_lookup(struct LookupMessage *message, struct Destination destination,
                 int sockfd) {
   struct LookupMessage reply;
@@ -95,6 +100,9 @@ int send_lookup(struct LookupMessage *message, struct Destination destination,
   return -1;
 }
 
+// Counterpart to `send_lookup`, receive `LookupMessage` and determine whether
+// or not this node needs to handle the message based on the hash and its ID.
+// It sends a reply message if it is responsible.
 int receive_lookup(struct LookupMessage *message, DHT_NODE *node, int sockfd) {
   struct Destination destination;
 

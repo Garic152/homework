@@ -32,6 +32,7 @@ struct tuple resources[MAX_RESOURCES] = {
     {"/static/bar", "Bar", sizeof "Bar" - 1},
     {"/static/baz", "Baz", sizeof "Baz" - 1}};
 
+// Initialize fields in given node based on console environment variables.
 void initialize_node(DHT_NODE *node) {
   // Read predecessor info from evnironment variables
   node->predecessor.id = atoi(getenv("PRED_ID"));
@@ -354,7 +355,7 @@ void parse_arguments(int argc, char *argv[], DHT_NODE *node) {
 }
 
 /**
- *  The program expects 5; otherwise, it returns EXIT_FAILURE.
+ *  The program expects 5 args; otherwise, it returns EXIT_FAILURE.
  *
  *  Call as:
  *

@@ -3,6 +3,10 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+/*
+ * Helper functions for handling strings (finding substrings and converting ints in strings to actual ints)
+ */
+
 typedef char *string; // differentiate null-terminated C-string from bytes
 
 /**

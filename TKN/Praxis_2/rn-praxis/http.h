@@ -7,6 +7,10 @@
 #define HTTP_MAX_SIZE 8192
 #define HTTP_MAX_HEADERS 40
 
+/*
+ * Helper functions for handling HTTP requests
+ */
+
 /**
  * Simple string tuple representing a HTTP header
  */

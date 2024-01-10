@@ -5,6 +5,10 @@
 
 #include "util.h"
 
+/*
+ * This more or less just defines a dict, a rather inefficient dict
+ */
+
 /**
  * A simple key-value entry
  *
