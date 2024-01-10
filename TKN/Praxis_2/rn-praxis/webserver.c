@@ -117,9 +117,9 @@ void send_reply(int conn, struct request *request, DHT_NODE *node) {
           get(request->uri, resources, MAX_RESOURCES, &resource_length);
 
       sprintf(reply,
-              "HTTP/1.1 303 See "
-              "Other\r\nLocation:http://%s:%d%s\r\nContent-Length: %lu\r\n\r\n",
-              ip_str, message.node_port, request->uri, resource_length);
+              "HTTP/1.1 503 Service Unavailable\r\n"
+              "Retry-after: 1\r\n"
+              "Content-length: 0\r\n");
     }
   }
 
