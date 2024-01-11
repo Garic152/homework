@@ -197,21 +197,21 @@ def zombieChristmas(rows, columns, positions):
     return christmasFate(positions)
 
 
-n, m = 5, 5
-
-# Initialize positions
-# Format: ('Type', Position Index), where Type can be 'Z', 'ZH', 'H', or 'HH'
-positions = []
-
-# Randomly assign positions to 20 players
-for _ in range(5):
-    # Randomly choose a type
-    type_choice = random.choice(['Z', 'ZH', 'H', 'HH'])
-
-    # Randomly choose a position
-    position = random.randint(0, n * m - 1)
-
-    # Add to positio
-    positions.append([type_choice, position])
-
-zombieChristmas(n, m, positions)
+# n, m = 5, 5
+#
+# # Initialize positions
+# # Format: ('Type', Position Index), where Type can be 'Z', 'ZH', 'H', or 'HH'
+# positions = []
+#
+# # Randomly assign positions to 20 players
+# for _ in range(5):
+#     # Randomly choose a type
+#     type_choice = random.choice(['Z', 'ZH', 'H', 'HH'])
+#
+#     # Randomly choose a position
+#     position = random.randint(0, n * m - 1)
+#
+#     # Add to positio
+#     positions.append([type_choice, position])
+#
+# zombieChristmas(n, m, positions)
