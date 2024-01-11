@@ -61,12 +61,20 @@ def extractSquare(positions):
     Extracts the positions with the highest position from a given array
     """
     max_value = positions[len(positions) - 1][1]
+    square = []
+    new_positions = []
 
-    square = [position for position in positions if position[1] == max_value]
-    positions = [
-        position for position in positions if position[1] != max_value]
+    for position in positions:
+        if position == max_value:
+            square.append(position)
+        else:
+            new_positions.append(position)
 
-    return positions, square
+    # square = [position for position in positions if position[1] == max_value]
+        # positions = [
+    # position for position in positions if position[1] != max_value]
+
+    return new_positions, square
 
 
 def giftExchange(square):
