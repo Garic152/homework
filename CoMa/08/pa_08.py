@@ -149,9 +149,9 @@ def christmasFate(positions):
             human = True
 
     if not human:
-        print("Zombies ate my Christmas!")
+        return "Zombies ate my Christmas!"
     elif human and not zombie:
-        print("Ho, ho, ho, and a merry Zombie-Christmas!")
+        return "Ho, ho, ho, and a merry Zombie-Christmas!"
 
 
 def print_board(rows, columns, positions):
