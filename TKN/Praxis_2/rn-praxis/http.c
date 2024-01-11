@@ -4,7 +4,7 @@
  */
 
 #include "http.h"
-#include "hashing.h"
+#include "DHT.h"
 
 #include <ctype.h>
 // #include <functional>

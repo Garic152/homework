@@ -14,34 +14,23 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include "DHT.h"
 #include "data.h"
-#include "hashing.h"
 #include "http.h"
+#include "structures.h"
 #include "util.h"
 
 #define MAX_RESOURCES 100
 #define BUFLEN 512
 #define EPOLL_MAX_EVENTS 10
 
+// Temporarely define UDP socket globally
+int udp_socket = -1;
+
 struct tuple resources[MAX_RESOURCES] = {
     {"/static/foo", "Foo", sizeof "Foo" - 1},
     {"/static/bar", "Bar", sizeof "Bar" - 1},
     {"/static/baz", "Baz", sizeof "Baz" - 1}};
-
-typedef struct {
-  uint32_t id;
-  // struct in_addr ip;
-  const char *ip;
-  // uint16_t port;
-  const char *port;
-  struct tuple resources[50];
-} DHT;
-
-typedef struct {
-  DHT predecessor;
-  DHT current;
-  DHT successor;
-} DHT_NODE;
 
 void initialize_node(DHT_NODE *node) {
   // Read predecessor info from evnironment variables
@@ -104,15 +93,33 @@ void send_reply(int conn, struct request *request, DHT_NODE *node) {
       reply = "HTTP/1.1 501 Method Not Supported\r\n\r\n";
     }
   } else {
-    size_t resource_length;
-    const char *resource =
-        get(request->uri, resources, MAX_RESOURCES, &resource_length);
+    // Copy lookup information into message struct
+    struct LookupMessage message = {.message_type = 0,
+                                    .hash_id = request->hash,
+                                    .node_id = node->current.id,
+                                    .node_ip = inet_addr(node->current.ip),
+                                    .node_port = atoi(node->current.port)};
 
-    sprintf(reply,
-            "HTTP/1.1 303 See "
-            "Other\r\nLocation:http://%s:%d%s\r\nContent-Length: %lu\r\n\r\n",
-            node->predecessor.ip, atoi(node->predecessor.port), request->uri,
-            resource_length);
+    // Copy destination node into Destination struct
+    struct Destination destination = {.node_ip = inet_addr(node->successor.ip),
+                                      .node_port = atoi(node->successor.port)};
+
+    if ((send_lookup(&message, destination, udp_socket)) < 0) {
+      perror("Send lookup");
+    } else {
+      // Handle IP adress
+      char ip_str[32];
+      inet_ntop(AF_INET, &(message.node_ip), ip_str, 32);
+
+      size_t resource_length;
+      const char *resource =
+          get(request->uri, resources, MAX_RESOURCES, &resource_length);
+
+      sprintf(reply,
+              "HTTP/1.1 303 See "
+              "Other\r\nLocation:http://%s:%d%s\r\nContent-Length: %lu\r\n\r\n",
+              ip_str, message.node_port, request->uri, resource_length);
+    }
   }
 
   // Send the reply back to the client
@@ -312,11 +319,19 @@ static int setup_server_socket(struct sockaddr_in addr, int is_udp) {
   }
 
   // Bind socket to the provided address
-  if (bind(sock, (struct sockaddr *)&addr, sizeof(addr)) == -1) {
+  if (bind(sock, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
     perror("bind");
     close(sock);
     exit(EXIT_FAILURE);
   }
+
+  uint namelen = sizeof(addr);
+  if (getsockname(sock, (struct sockaddr *)&addr, &namelen) < 0) {
+    perror("getsockname()");
+    exit(3);
+  }
+
+  printf("Port %d is assigned to %d\n", ntohs(addr.sin_port), sock);
 
   if (!is_udp) {
     // Start listening on the socket with maximum backlog of 1 pending
@@ -376,7 +391,7 @@ int main(int argc, char **argv) {
     exit(EXIT_FAILURE);
   }
 
-  for (int i = 0; i <= MAX_NODES; i++) {
+  for (int i = 0; i < MAX_NODES; i++) {
     struct sockaddr_in addr = derive_sockaddr(argv[1], nodes[i].current.port);
 
     // Set up a TCP server socket.
@@ -384,6 +399,8 @@ int main(int argc, char **argv) {
 
     // Set up a UDP server socket.
     int udp_server_socket = setup_server_socket(addr, 1);
+    // Temporarely pass the UDP socket into global var
+    udp_socket = udp_server_socket;
 
     server_sockets[i * 2] = tcp_server_socket;
     server_sockets[i * 2 + 1] = udp_server_socket;
@@ -461,6 +478,20 @@ int main(int argc, char **argv) {
                      (struct sockaddr *)&sender_addr, &sender_addr_len);
         if (received_bytes == -1) {
           perror("recfrom");
+        } else if (received_bytes == sizeof(struct LookupMessage)) {
+          struct LookupMessage *message = (struct LookupMessage *)buffer;
+
+          // Convert received message from network byte order to host byte order
+          message->message_type = ntohl(message->message_type);
+          message->hash_id = ntohl(message->hash_id);
+          message->node_id = ntohl(message->node_id);
+          message->node_port = ntohs(message->node_port);
+
+          // Handle IP adress
+          char ipStr[32];
+          inet_ntop(AF_INET, &(message->node_ip), ipStr, 32);
+
+          receive_lookup(message, &nodes[0], events[i].data.fd);
         }
       } else {
         int conn_fd = events[i].data.fd;
