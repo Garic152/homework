@@ -9,32 +9,40 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/epoll.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h>
 
+#include "DHT.h"
 #include "data.h"
 #include "http.h"
+#include "structures.h"
 #include "util.h"
 
 #define MAX_RESOURCES 100
 #define BUFLEN 512
+#define EPOLL_MAX_EVENTS 10
+
+// Temporarely define UDP socket globally
+int udp_socket = -1;
 
 struct tuple resources[MAX_RESOURCES] = {
     {"/static/foo", "Foo", sizeof "Foo" - 1},
     {"/static/bar", "Bar", sizeof "Bar" - 1},
     {"/static/baz", "Baz", sizeof "Baz" - 1}};
 
-typedef struct {
-  uint32_t id;
-  struct in_addr ip;
-  uint16_t port;
-} DHT_Node;
+void initialize_node(DHT_NODE *node) {
+  // Read predecessor info from evnironment variables
+  node->predecessor.id = atoi(getenv("PRED_ID"));
+  node->predecessor.ip = getenv("PRED_IP");
+  node->predecessor.port = getenv("PRED_PORT");
 
-typedef struct {
-  DHT_Node predecessor;
-  DHT_Node successor;
-} DHT_NEIGHBOR;
+  // Read successor info from environment variables
+  node->successor.id = atoi(getenv("SUCC_ID"));
+  node->successor.ip = getenv("SUCC_IP");
+  node->successor.port = getenv("SUCC_PORT");
+}
 
 /**
  * Sends an HTTP reply to the client based on the received request.
@@ -43,7 +51,7 @@ typedef struct {
  * @param request   A pointer to the struct containing the parsed request
  * information.
  */
-void send_reply(int conn, struct request *request) {
+void send_reply(int conn, struct request *request, DHT_NODE *node) {
 
   // Create a buffer to hold the HTTP reply
   char buffer[HTTP_MAX_SIZE];
@@ -52,36 +60,66 @@ void send_reply(int conn, struct request *request) {
   fprintf(stderr, "Handling %s request for %s (%lu byte payload)\n",
           request->method, request->uri, request->payload_length);
 
-  if (strcmp(request->method, "GET") == 0) {
-    // Find the resource with the given URI in the 'resources' array.
-    size_t resource_length;
-    const char *resource =
-        get(request->uri, resources, MAX_RESOURCES, &resource_length);
+  if (is_responsible(node->current.id, node->successor.id, request->hash)) {
+    if (strcmp(request->method, "GET") == 0) {
+      // Find the resource with the given URI in the 'resources' array.
+      size_t resource_length;
+      const char *resource =
+          get(request->uri, resources, MAX_RESOURCES, &resource_length);
 
-    if (resource) {
-      sprintf(reply, "HTTP/1.1 200 OK\r\nContent-Length: %lu\r\n\r\n%.*s",
-              resource_length, (int)resource_length, resource);
+      if (resource) {
+        sprintf(reply, "HTTP/1.1 200 OK\r\nContent-Length: %lu\r\n\r\n%.*s",
+                resource_length, (int)resource_length, resource);
+      } else {
+        reply = "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\n\r\n";
+      }
+    } else if (strcmp(request->method, "PUT") == 0) {
+      // Try to set the requested resource with the given payload in the
+      // 'resources' array.
+      if (set(request->uri, request->payload, request->payload_length,
+              resources, MAX_RESOURCES)) {
+        reply = "HTTP/1.1 204 No Content\r\n\r\n";
+      } else {
+        reply = "HTTP/1.1 201 Created\r\nContent-Length: 0\r\n\r\n";
+      }
+    } else if (strcmp(request->method, "DELETE") == 0) {
+      // Try to delete the requested resource from the 'resources' array
+      if (delete (request->uri, resources, MAX_RESOURCES)) {
+        reply = "HTTP/1.1 204 No Content\r\n\r\n";
+      } else {
+        reply = "HTTP/1.1 404 Not Found\r\n\r\n";
+      }
     } else {
-      reply = "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\n\r\n";
-    }
-  } else if (strcmp(request->method, "PUT") == 0) {
-    // Try to set the requested resource with the given payload in the
-    // 'resources' array.
-    if (set(request->uri, request->payload, request->payload_length, resources,
-            MAX_RESOURCES)) {
-      reply = "HTTP/1.1 204 No Content\r\n\r\n";
-    } else {
-      reply = "HTTP/1.1 201 Created\r\nContent-Length: 0\r\n\r\n";
-    }
-  } else if (strcmp(request->method, "DELETE") == 0) {
-    // Try to delete the requested resource from the 'resources' array
-    if (delete (request->uri, resources, MAX_RESOURCES)) {
-      reply = "HTTP/1.1 204 No Content\r\n\r\n";
-    } else {
-      reply = "HTTP/1.1 404 Not Found\r\n\r\n";
+      reply = "HTTP/1.1 501 Method Not Supported\r\n\r\n";
     }
   } else {
-    reply = "HTTP/1.1 501 Method Not Supported\r\n\r\n";
+    // Copy lookup information into message struct
+    struct LookupMessage message = {.message_type = 0,
+                                    .hash_id = request->hash,
+                                    .node_id = node->current.id,
+                                    .node_ip = inet_addr(node->current.ip),
+                                    .node_port = atoi(node->current.port)};
+
+    // Copy destination node into Destination struct
+    struct Destination destination = {.node_ip = inet_addr(node->successor.ip),
+                                      .node_port = atoi(node->successor.port)};
+
+    if ((send_lookup(&message, destination, udp_socket)) < 0) {
+      perror("Send lookup");
+    } else {
+      // Handle IP adress
+      char ip_str[32];
+      inet_ntop(AF_INET, &(message.node_ip), ip_str, 32);
+
+      size_t resource_length;
+      const char *resource =
+          get(request->uri, resources, MAX_RESOURCES, &resource_length);
+
+      sprintf(reply,
+              "HTTP/1.1 303 See "
+              "Other\r\nLocation:http://%s:%d%s\r\nContent-Length: %lu\r\n\r\n",
+              ip_str, message.node_port, request->uri, resource_length);
+    }
   }
 
   // Send the reply back to the client
@@ -104,13 +142,13 @@ void send_reply(int conn, struct request *request) {
  * malformed or an error occurs during processing, the return value is -1.
  *
  */
-size_t process_packet(int conn, char *buffer, size_t n) {
+size_t process_packet(int conn, char *buffer, size_t n, DHT_NODE node) {
   struct request request = {
       .method = NULL, .uri = NULL, .payload = NULL, .payload_length = -1};
   ssize_t bytes_processed = parse_request(buffer, n, &request);
 
   if (bytes_processed > 0) {
-    send_reply(conn, &request);
+    send_reply(conn, &request, &node);
 
     // Check the "Connection" header in the request to determine if the
     // connection should be kept alive or closed.
@@ -178,7 +216,7 @@ char *buffer_discard(char *buffer, size_t discard, size_t keep) {
  * false otherwise. If an error occurs while receiving data from the socket, the
  * function exits the program.
  */
-bool handle_connection(struct connection_state *state) {
+bool handle_connection(struct connection_state *state, DHT_NODE *node) {
   // Calculate the pointer to the end of the buffer to avoid buffer overflow
   const char *buffer_end = state->buffer + HTTP_MAX_SIZE;
 
@@ -198,7 +236,8 @@ bool handle_connection(struct connection_state *state) {
 
   ssize_t bytes_processed = 0;
   while ((bytes_processed = process_packet(state->sock, window_start,
-                                           window_end - window_start)) > 0) {
+                                           window_end - window_start, *node)) >
+         0) {
     window_start += bytes_processed;
   }
   if (bytes_processed == -1) {
@@ -280,11 +319,19 @@ static int setup_server_socket(struct sockaddr_in addr, int is_udp) {
   }
 
   // Bind socket to the provided address
-  if (bind(sock, (struct sockaddr *)&addr, sizeof(addr)) == -1) {
+  if (bind(sock, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
     perror("bind");
     close(sock);
     exit(EXIT_FAILURE);
   }
+
+  uint namelen = sizeof(addr);
+  if (getsockname(sock, (struct sockaddr *)&addr, &namelen) < 0) {
+    perror("getsockname()");
+    exit(3);
+  }
+
+  printf("Port %d is assigned to %d\n", ntohs(addr.sin_port), sock);
 
   if (!is_udp) {
     // Start listening on the socket with maximum backlog of 1 pending
@@ -298,105 +345,167 @@ static int setup_server_socket(struct sockaddr_in addr, int is_udp) {
   return sock;
 }
 
+void parse_arguments(int argc, char *argv[], DHT_NODE *node) {
+  node->current.ip = argv[1];
+  node->current.port = argv[2];
+  if (argc == 4) {
+    node->current.id = atoi(argv[3]);
+  }
+}
+
 /**
- *  The program expects 3; otherwise, it returns EXIT_FAILURE.
+ *  The program expects 5; otherwise, it returns EXIT_FAILURE.
  *
  *  Call as:
  *
- *  ./build/webserver self.ip self.port
+ *  ./build/webserver self.ip self.port self.id
  */
 int main(int argc, char **argv) {
-  if (argc != 4) {
+  if (argc < 3) {
     return EXIT_FAILURE;
   }
 
-  uint32_t local_id = (uint32_t)atoi(argv[3]);
+  const int MAX_NODES = 1;
+  DHT_NODE nodes[MAX_NODES];
 
-  // parse env variables into DHT_NEIGHBOR
-  DHT_NEIGHBOR neighbors;
-  neighbors.predecessor.id = (uint32_t)atoi(getenv("PRED_ID"));
-  inet_pton(AF_INET, getenv("PRED_IP"), &neighbors.predecessor.ip);
-  neighbors.predecessor.port = (uint16_t)atoi(getenv("PRED_PORT"));
+  if (argc == 3) {
+    parse_arguments(argc, argv, &nodes[0]);
+  } else if (argc == 4) {
+    initialize_node(&nodes[0]);
+    parse_arguments(argc, argv, &nodes[0]);
+  }
 
-  neighbors.successor.id = (uint32_t)atoi(getenv("PRED_ID"));
-  inet_pton(AF_INET, getenv("PRED_IP"), &neighbors.successor.ip);
-  neighbors.successor.port = (uint16_t)atoi(getenv("PRED_PORT"));
+  // Initialize epoll()
+  struct epoll_event ev, events[EPOLL_MAX_EVENTS];
 
-  struct sockaddr_in addr = derive_sockaddr(argv[1], argv[2]);
+  int epoll_fd = epoll_create1(0);
+  if (epoll_fd == 1) {
+    perror("epoll");
+    return 1;
+  }
 
-  // Set up a TCP server socket.
-  int tcp_server_socket = setup_server_socket(addr, 0);
+  int *server_sockets = malloc(MAX_NODES * 2 * sizeof(int));
 
-  // Set up a UDP server socket.
-  int udp_server_socket = setup_server_socket(addr, 1);
+  if (!server_sockets) {
+    perror("malloc");
+    exit(EXIT_FAILURE);
+  }
 
-  // Create an array of pollfd structures to monitor sockets.
-  struct pollfd sockets[2] = {
-      {.fd = tcp_server_socket, .events = POLLIN},
-      {.fd = udp_server_socket, .events = POLLIN},
-  };
+  for (int i = 0; i < MAX_NODES; i++) {
+    struct sockaddr_in addr = derive_sockaddr(argv[1], nodes[i].current.port);
+
+    // Set up a TCP server socket.
+    int tcp_server_socket = setup_server_socket(addr, 0);
+
+    // Set up a UDP server socket.
+    int udp_server_socket = setup_server_socket(addr, 1);
+    // Temporarely pass the UDP socket into global var
+    udp_socket = udp_server_socket;
+
+    server_sockets[i * 2] = tcp_server_socket;
+    server_sockets[i * 2 + 1] = udp_server_socket;
+
+    ev.events = EPOLLIN;
+
+    ev.data.fd = tcp_server_socket;
+    if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, tcp_server_socket, &ev) == -1) {
+      perror("epoll_ctl: tcp_server_socket");
+      exit(EXIT_FAILURE);
+    }
+
+    ev.data.fd = udp_server_socket;
+    if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, udp_server_socket, &ev) == -1) {
+      perror("epoll_ctl: udp_server_socket");
+      exit(EXIT_FAILURE);
+    }
+  }
 
   struct connection_state state = {0};
+
   while (true) {
 
-    // Use poll() to wait for events on the monitored sockets.
-    int ready = poll(sockets, sizeof(sockets) / sizeof(sockets[0]), -1);
-    if (ready == -1) {
-      perror("poll");
+    // Use epoll() to wait for events on the monitored sockets.
+    int n = epoll_wait(epoll_fd, events, EPOLL_MAX_EVENTS, -1);
+    if (n == -1) {
+      perror("epoll wait");
       exit(EXIT_FAILURE);
     }
 
     // Process events on the monitored sockets.
-    for (size_t i = 0; i < sizeof(sockets) / sizeof(sockets[0]); i += 1) {
-      if (sockets[i].revents != POLLIN) {
-        // If there are no POLLIN events on the socket, continue to the next
-        // iteration.
-        continue;
+    for (int i = 0; i < n; i++) {
+      int current_fd = events[i].data.fd;
+
+      bool is_tcp_socket = false;
+      bool is_udp_socket = false;
+
+      for (int j = 0; j < MAX_NODES * 2; j++) {
+        if (server_sockets[j] == current_fd) {
+          if (j % 2 == 0) {
+            is_tcp_socket = true;
+          } else {
+            is_udp_socket = true;
+          }
+          break;
+        }
       }
-      int s = sockets[i].fd;
 
-      if (s == tcp_server_socket) {
-
-        printf("RECEIVED TCP\n");
+      // Check if current connection is tcp
+      if (is_tcp_socket) {
         // If the event is on the server_socket, accept a new connection from a
         // client.
-        int connection = accept(tcp_server_socket, NULL, NULL);
+        int connection = accept(current_fd, NULL, NULL);
         if (connection == -1 && errno != EAGAIN && errno != EWOULDBLOCK) {
-          close(tcp_server_socket);
+          close(current_fd);
           perror("accept");
           exit(EXIT_FAILURE);
-        } else {
-          connection_setup(&state, connection);
-
-          // limit to one connection at a time
-          sockets[0].events = 0;
-          sockets[1].fd = connection;
-          sockets[1].events = POLLIN;
+        } // else {
+        connection_setup(&state, connection);
+        // Close connection
+        ev.events = EPOLLIN;
+        ev.data.fd = connection;
+        if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, connection, &ev) == -1) {
+          perror("epoll_ctl: connection");
+          close(connection);
         }
-      } else if (s == udp_server_socket) {
-
-        printf("RECEIVED UDP\n");
-
+        // else handle data from udp
+      } else if (is_udp_socket) {
         char buffer[BUFLEN];
         struct sockaddr_in sender_addr;
         socklen_t sender_addr_len = sizeof(sender_addr);
 
         int received_bytes =
-            recvfrom(udp_server_socket, buffer, BUFLEN, 0,
+            recvfrom(current_fd, buffer, BUFLEN, 0,
                      (struct sockaddr *)&sender_addr, &sender_addr_len);
         if (received_bytes == -1) {
           perror("recfrom");
+        } else if (received_bytes == sizeof(struct LookupMessage)) {
+          struct LookupMessage *message = (struct LookupMessage *)buffer;
+
+          // Convert received message from network byte order to host byte order
+          message->message_type = ntohl(message->message_type);
+          message->hash_id = ntohl(message->hash_id);
+          message->node_id = ntohl(message->node_id);
+          message->node_port = ntohs(message->node_port);
+
+          // Handle IP adress
+          char ipStr[32];
+          inet_ntop(AF_INET, &(message->node_ip), ipStr, 32);
+
+          receive_lookup(message, &nodes[0], events[i].data.fd);
         }
       } else {
-        assert(s == state.sock);
+        int conn_fd = events[i].data.fd;
+
+        state.sock = conn_fd;
 
         // Call the 'handle_connection' function to process the incoming data on
         // the socket.
-        bool cont = handle_connection(&state);
+        bool cont = handle_connection(&state, &nodes[0]);
         if (!cont) { // get ready for a new connection
-          sockets[0].events = POLLIN;
-          sockets[1].fd = -1;
-          sockets[1].events = 0;
+          if (epoll_ctl(epoll_fd, EPOLL_CTL_DEL, conn_fd, NULL) == -1) {
+            perror("epoll_ctl: remove connection");
+          }
+          close(conn_fd);
         }
       }
     }

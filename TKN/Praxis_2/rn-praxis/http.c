@@ -4,7 +4,7 @@
  */
 
 #include "http.h"
-#include "hashing.h"
+#include "DHT.h"
 
 #include <ctype.h>
 // #include <functional>
@@ -145,9 +145,8 @@ ssize_t parse_request(char *buffer, size_t n, struct request *request) {
 
   uri.start[uri.n] = '\0';
 
-  hash(uri.start);
-
   request->uri = uri.start;
+  request->hash = hash(uri.start);
 
   for (size_t i = 0; i < header_count; i += 1) {
     headers[i].key.start[headers[i].key.n] = '\0';
