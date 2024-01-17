@@ -60,7 +60,7 @@ void send_reply(int conn, struct request *request, DHT_NODE *node) {
   fprintf(stderr, "Handling %s request for %s (%lu byte payload)\n",
           request->method, request->uri, request->payload_length);
 
-  if (is_responsible(node->current.id, node->successor.id, request->hash)) {
+  if (is_responsible(node->current.id, node->predecessor.id, request->hash)) {
     if (strcmp(request->method, "GET") == 0) {
       // Find the resource with the given URI in the 'resources' array.
       size_t resource_length;
