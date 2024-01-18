@@ -21,11 +21,23 @@
 #include "util.h"
 
 #define MAX_RESOURCES 100
+#define MAX_ENTRIES 10
 #define BUFLEN 512
 #define EPOLL_MAX_EVENTS 10
 
 // Temporarely define UDP socket globally
 int udp_socket = -1;
+
+typedef struct {
+  in_addr_t ip;
+  uint32_t resource;
+  int port;
+} DHT_Entry;
+
+typedef struct {
+  DHT_Entry entries[10];
+  int current;
+} DHT_History;
 
 struct tuple resources[MAX_RESOURCES] = {
     {"/static/foo", "Foo", sizeof "Foo" - 1},
@@ -44,6 +56,29 @@ void initialize_node(DHT_NODE *node) {
   node->successor.port = getenv("SUCC_PORT");
 }
 
+void initialize_dht_history(DHT_History *history) {
+  memset(history, 0, sizeof(DHT_History));
+}
+
+void addEntry(DHT_History *history, in_addr_t *ip, uint32_t *resource,
+              int *port) {
+  history->entries[history->current].ip = *ip;
+  history->entries[history->current].resource = *resource;
+  history->entries[history->current].port = *port;
+
+  history->current = (history->current + 1) % MAX_ENTRIES;
+}
+
+int findEntry(DHT_History *history, uint32_t *resource, DHT_Entry *result) {
+  for (int i = 0; i < MAX_ENTRIES; i++) {
+    if (history->entries[i].resource == *resource) {
+      *result = history->entries[i];
+      return 1;
+    }
+  }
+  return 0;
+}
+
 /**
  * Sends an HTTP reply to the client based on the received request.
  *
@@ -51,7 +86,8 @@ void initialize_node(DHT_NODE *node) {
  * @param request   A pointer to the struct containing the parsed request
  * information.
  */
-void send_reply(int conn, struct request *request, DHT_NODE *node) {
+void send_reply(int conn, struct request *request, DHT_NODE *node,
+                DHT_History *history) {
 
   // Create a buffer to hold the HTTP reply
   char buffer[HTTP_MAX_SIZE];
@@ -93,32 +129,44 @@ void send_reply(int conn, struct request *request, DHT_NODE *node) {
       reply = "HTTP/1.1 501 Method Not Supported\r\n\r\n";
     }
   } else {
-    // Copy lookup information into message struct
-    struct LookupMessage message = {.message_type = 0,
-                                    .hash_id = request->hash,
-                                    .node_id = node->current.id,
-                                    .node_ip = inet_addr(node->current.ip),
-                                    .node_port = atoi(node->current.port)};
+    DHT_Entry entry;
+    if (findEntry(history, &request->hash, &entry)) {
 
-    // Copy destination node into Destination struct
-    struct Destination destination = {.node_ip = inet_addr(node->successor.ip),
-                                      .node_port = atoi(node->successor.port)};
-
-    if ((send_lookup(&message, destination, udp_socket)) < 0) {
-      perror("Send lookup");
-    } else {
       // Handle IP adress
       char ip_str[32];
-      inet_ntop(AF_INET, &(message.node_ip), ip_str, 32);
-
-      size_t resource_length;
-      const char *resource =
-          get(request->uri, resources, MAX_RESOURCES, &resource_length);
+      inet_ntop(AF_INET, &(entry.ip), ip_str, 32);
 
       sprintf(reply,
               "HTTP/1.1 303 See "
-              "Other\r\nLocation:http://%s:%d%s\r\nContent-Length: %lu\r\n\r\n",
-              ip_str, message.node_port, request->uri, resource_length);
+              "Other\r\nLocation:http://%s:%d%s\r\nContent-Length: 0\r\n\r\n",
+              ip_str, entry.port, request->uri);
+    } else {
+
+      // Copy lookup information into message struct
+      struct LookupMessage message = {.message_type = 0,
+                                      .hash_id = request->hash,
+                                      .node_id = node->current.id,
+                                      .node_ip = inet_addr(node->current.ip),
+                                      .node_port = atoi(node->current.port)};
+
+      // Copy destination node into Destination struct
+      struct Destination destination = {
+          .node_ip = inet_addr(node->successor.ip),
+          .node_port = atoi(node->successor.port)};
+
+      sprintf(reply, "HTTP/1.1 503 Service Unavailable\r\nRetry-After: "
+                     "5\r\nContent-Length: 0\r\n\r\n");
+
+      if ((send_lookup(&message, destination, udp_socket)) < 0) {
+        perror("Send lookup");
+      } else {
+        // Handle IP adress
+        char ip_str[32];
+        inet_ntop(AF_INET, &(message.node_ip), ip_str, 32);
+
+        addEntry(history, &message.node_ip, &message.hash_id,
+                 &message.node_port);
+      }
     }
   }
 
@@ -142,13 +190,14 @@ void send_reply(int conn, struct request *request, DHT_NODE *node) {
  * malformed or an error occurs during processing, the return value is -1.
  *
  */
-size_t process_packet(int conn, char *buffer, size_t n, DHT_NODE node) {
+size_t process_packet(int conn, char *buffer, size_t n, DHT_NODE node,
+                      DHT_History *history) {
   struct request request = {
       .method = NULL, .uri = NULL, .payload = NULL, .payload_length = -1};
   ssize_t bytes_processed = parse_request(buffer, n, &request);
 
   if (bytes_processed > 0) {
-    send_reply(conn, &request, &node);
+    send_reply(conn, &request, &node, history);
 
     // Check the "Connection" header in the request to determine if the
     // connection should be kept alive or closed.
@@ -216,7 +265,8 @@ char *buffer_discard(char *buffer, size_t discard, size_t keep) {
  * false otherwise. If an error occurs while receiving data from the socket, the
  * function exits the program.
  */
-bool handle_connection(struct connection_state *state, DHT_NODE *node) {
+bool handle_connection(struct connection_state *state, DHT_NODE *node,
+                       DHT_History *history) {
   // Calculate the pointer to the end of the buffer to avoid buffer overflow
   const char *buffer_end = state->buffer + HTTP_MAX_SIZE;
 
@@ -235,9 +285,9 @@ bool handle_connection(struct connection_state *state, DHT_NODE *node) {
   char *window_end = state->end + bytes_read;
 
   ssize_t bytes_processed = 0;
-  while ((bytes_processed = process_packet(state->sock, window_start,
-                                           window_end - window_start, *node)) >
-         0) {
+  while ((bytes_processed =
+              process_packet(state->sock, window_start,
+                             window_end - window_start, *node, history)) > 0) {
     window_start += bytes_processed;
   }
   if (bytes_processed == -1) {
@@ -365,6 +415,7 @@ int main(int argc, char **argv) {
     return EXIT_FAILURE;
   }
 
+  // Initialize node information
   const int MAX_NODES = 1;
   DHT_NODE nodes[MAX_NODES];
 
@@ -374,6 +425,10 @@ int main(int argc, char **argv) {
     initialize_node(&nodes[0]);
     parse_arguments(argc, argv, &nodes[0]);
   }
+
+  // Initialize dht_lookup_table
+  DHT_History history;
+  initialize_dht_history(&history);
 
   // Initialize epoll()
   struct epoll_event ev, events[EPOLL_MAX_EVENTS];
@@ -500,7 +555,7 @@ int main(int argc, char **argv) {
 
         // Call the 'handle_connection' function to process the incoming data on
         // the socket.
-        bool cont = handle_connection(&state, &nodes[0]);
+        bool cont = handle_connection(&state, &nodes[0], &history);
         if (!cont) { // get ready for a new connection
           if (epoll_ctl(epoll_fd, EPOLL_CTL_DEL, conn_fd, NULL) == -1) {
             perror("epoll_ctl: remove connection");
