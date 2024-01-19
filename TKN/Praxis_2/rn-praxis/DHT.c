@@ -99,7 +99,9 @@ int send_lookup(struct LookupMessage *message, struct Destination destination,
 int receive_lookup(struct LookupMessage *message, DHT_NODE *node, int sockfd) {
   struct Destination destination;
 
-  if (message->hash_id < node->current.id) {
+  if (message->hash_id <= node->current.id &&
+      message->hash_id > node->predecessor.id) {
+
     // Redefine destination to root node
     destination.node_port = message->node_port;
     destination.node_ip = message->node_ip;

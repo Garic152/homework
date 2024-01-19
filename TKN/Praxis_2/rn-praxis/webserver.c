@@ -533,6 +533,7 @@ int main(int argc, char **argv) {
                      (struct sockaddr *)&sender_addr, &sender_addr_len);
         if (received_bytes == -1) {
           perror("recfrom");
+          close(events[i].data.fd);
         } else if (received_bytes == sizeof(struct LookupMessage)) {
           struct LookupMessage *message = (struct LookupMessage *)buffer;
 
