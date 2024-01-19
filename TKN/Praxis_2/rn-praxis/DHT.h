@@ -6,6 +6,17 @@
 #ifndef HASHING_H
 #define HASHING_H
 
+#define LOG_LEVEL_DEBUG 0
+#define LOG_LEVEL_INFO 1
+#define LOG_LEVEL_WARN 2
+#define LOG_LEVEL_ERROR 3
+
+extern int currentLogLevel;
+
+#define LOG(level, fmt, ...)                                                   \
+  if (level >= currentLogLevel)                                                \
+  fprintf(stderr, fmt, ##__VA_ARGS__)
+
 struct LookupMessage {
   int message_type;
   uint32_t hash_id;

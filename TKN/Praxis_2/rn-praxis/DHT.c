@@ -26,6 +26,7 @@ bool is_responsible(uint32_t current_id, uint32_t predecessor_id,
 
 int send_message(struct LookupMessage *message, struct Destination destination,
                  int sockfd) {
+
   struct sockaddr_in nodeAddr;
 
   // Set necessary information f:w
@@ -52,6 +53,9 @@ int send_message(struct LookupMessage *message, struct Destination destination,
 
 int send_lookup(struct LookupMessage *message, struct Destination destination,
                 int sockfd) {
+  LOG(LOG_LEVEL_INFO,
+      "Now sending message from node %u into dht on socket: %u\n",
+      message->node_port, sockfd);
   struct LookupMessage reply;
   struct sockaddr_in nodeAddr;
   socklen_t addr_len = sizeof(nodeAddr);
@@ -87,10 +91,10 @@ int send_lookup(struct LookupMessage *message, struct Destination destination,
 
     *message = *received_message;
 
-    close(sockfd);
+    // close(sockfd);
     return 0;
   } else {
-    close(sockfd);
+    // close(sockfd);
     return -1;
   }
   return -1;
@@ -115,7 +119,7 @@ int receive_lookup(struct LookupMessage *message, DHT_NODE *node, int sockfd) {
     if (send_message(message, destination, sockfd) < 0) {
       return -1;
     }
-    return 1;
+    return 0;
   } else {
     // Node is not responsible, send information to next node
     destination.node_ip = inet_addr(node->successor.ip);
@@ -123,6 +127,6 @@ int receive_lookup(struct LookupMessage *message, DHT_NODE *node, int sockfd) {
     if (send_message(message, destination, sockfd) < 0) {
       return -1;
     }
-    return 1;
+    return 0;
   }
 }

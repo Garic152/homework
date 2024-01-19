@@ -25,6 +25,8 @@
 #define BUFLEN 512
 #define EPOLL_MAX_EVENTS 10
 
+int currentLogLevel = LOG_LEVEL_DEBUG;
+
 // Temporarely define UDP socket globally
 int udp_socket = -1;
 
@@ -89,6 +91,8 @@ int findEntry(DHT_History *history, uint32_t *resource, DHT_Entry *result) {
 void send_reply(int conn, struct request *request, DHT_NODE *node,
                 DHT_History *history) {
 
+  LOG(LOG_LEVEL_DEBUG, "Entering send_reply for connection %d\n", conn);
+
   // Create a buffer to hold the HTTP reply
   char buffer[HTTP_MAX_SIZE];
   char *reply = buffer;
@@ -97,7 +101,10 @@ void send_reply(int conn, struct request *request, DHT_NODE *node,
           request->method, request->uri, request->payload_length);
 
   if (is_responsible(node->current.id, node->predecessor.id, request->hash)) {
+    LOG(LOG_LEVEL_INFO, "Node is responsible for the request\n");
+
     if (strcmp(request->method, "GET") == 0) {
+      LOG(LOG_LEVEL_DEBUG, "Handling GET request for URI: %s\n", request->uri);
       // Find the resource with the given URI in the 'resources' array.
       size_t resource_length;
       const char *resource =
@@ -110,6 +117,7 @@ void send_reply(int conn, struct request *request, DHT_NODE *node,
         reply = "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\n\r\n";
       }
     } else if (strcmp(request->method, "PUT") == 0) {
+      LOG(LOG_LEVEL_DEBUG, "Handling PUT request for URI: %s\n", request->uri);
       // Try to set the requested resource with the given payload in the
       // 'resources' array.
       if (set(request->uri, request->payload, request->payload_length,
@@ -129,8 +137,11 @@ void send_reply(int conn, struct request *request, DHT_NODE *node,
       reply = "HTTP/1.1 501 Method Not Supported\r\n\r\n";
     }
   } else {
+    LOG(LOG_LEVEL_INFO,
+        "Node is not responsible, performing lookup or sending 503\n");
     DHT_Entry entry;
     if (findEntry(history, &request->hash, &entry)) {
+      LOG(LOG_LEVEL_INFO, "Lookup successful for hash: %u\n", request->hash);
 
       // Handle IP adress
       char ip_str[32];
@@ -141,6 +152,10 @@ void send_reply(int conn, struct request *request, DHT_NODE *node,
               "Other\r\nLocation:http://%s:%d%s\r\nContent-Length: 0\r\n\r\n",
               ip_str, entry.port, request->uri);
     } else {
+      LOG(LOG_LEVEL_WARN,
+          "Sending 503 Service Unavailable for hash and performing lookup: "
+          "%u\n",
+          request->hash);
 
       // Copy lookup information into message struct
       struct LookupMessage message = {.message_type = 0,
@@ -158,6 +173,7 @@ void send_reply(int conn, struct request *request, DHT_NODE *node,
                      "5\r\nContent-Length: 0\r\n\r\n");
 
       if ((send_lookup(&message, destination, udp_socket)) < 0) {
+        LOG(LOG_LEVEL_ERROR, "Failed to send or receive on lookup\n");
         perror("Send lookup");
       } else {
         // Handle IP adress
@@ -170,11 +186,14 @@ void send_reply(int conn, struct request *request, DHT_NODE *node,
     }
   }
 
+  LOG(LOG_LEVEL_INFO, "Sending reply: %s\n", reply);
   // Send the reply back to the client
   if (send(conn, reply, strlen(reply), 0) == -1) {
     perror("send");
+    LOG(LOG_LEVEL_ERROR, "Failed to send reply on connection %d\n", conn);
     close(conn);
   }
+  LOG(LOG_LEVEL_DEBUG, "Exiting send_reply for connection %d\n", conn);
 }
 
 /**
@@ -533,8 +552,13 @@ int main(int argc, char **argv) {
                      (struct sockaddr *)&sender_addr, &sender_addr_len);
         if (received_bytes == -1) {
           perror("recfrom");
+          LOG(LOG_LEVEL_DEBUG,
+              "Didnt receive udp data, now closing socket: %u\n",
+              events[i].data.fd);
           close(events[i].data.fd);
         } else if (received_bytes == sizeof(struct LookupMessage)) {
+          LOG(LOG_LEVEL_DEBUG, "Received UDP data on sock: %u\n",
+              events[i].data.fd);
           struct LookupMessage *message = (struct LookupMessage *)buffer;
 
           // Convert received message from network byte order to host byte order
@@ -547,7 +571,13 @@ int main(int argc, char **argv) {
           char ipStr[32];
           inet_ntop(AF_INET, &(message->node_ip), ipStr, 32);
 
-          receive_lookup(message, &nodes[0], events[i].data.fd);
+          if (receive_lookup(message, &nodes[0], events[i].data.fd) < 0) {
+            perror("receive_lookup");
+            close(events[i].data.fd);
+            LOG(LOG_LEVEL_ERROR, "receive lookup failed");
+          };
+        } else {
+          LOG(LOG_LEVEL_WARN, "RECEIVED WRONG UDP PACKAGE!");
         }
       } else {
         int conn_fd = events[i].data.fd;
