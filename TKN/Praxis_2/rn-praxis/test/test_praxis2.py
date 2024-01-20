@@ -1,7 +1,5 @@
 import contextlib
-import socket
 import struct
-import sys
 import time
 import urllib.request as req
 from urllib.parse import urlparse
@@ -32,17 +30,16 @@ def _iter_with_neighbors(xs):
 def static_peer(request):
     """Return a function for spawning DHT peers
     """
-    def runner(peer, predecessor, successor):
+    def runner(peer, predecessor=None, successor=None):
         """Spawn a static DHT peer
 
         The peer is passed its local neighborhood via environment variables.
         """
         return util.KillOnExit(
-            [request.config.getoption('executable'),
-             peer.ip, f'{peer.port}', f'{peer.id}'],
+            [request.config.getoption('executable'), peer.ip, f'{peer.port}'] + ([f'{peer.id}'] if peer.id is not None else []),
             env={
-                'PRED_ID': f'{predecessor.id}', 'PRED_IP': predecessor.ip, 'PRED_PORT': f'{predecessor.port}',
-                'SUCC_ID': f'{successor.id}', 'SUCC_IP': successor.ip, 'SUCC_PORT': f'{successor.port}',
+                **({'PRED_ID': f'{predecessor.id}', 'PRED_IP': predecessor.ip, 'PRED_PORT': f'{predecessor.port}'} if predecessor is not None else {}),
+                **({'SUCC_ID': f'{successor.id}', 'SUCC_IP': successor.ip, 'SUCC_PORT': f'{successor.port}'} if successor is not None else {}),
                 'NO_STABILIZE': '1',  # Forward compatibility with P3.
             },
         )
@@ -56,8 +53,8 @@ def test_listen(static_peer):
     Listens on UDP port.
     """
 
-    self = dht.Peer(0x0000, '127.0.0.1', 4711)
-    with static_peer(self, self, self):  # Spoof DHT neighborhood for now
+    self = dht.Peer(None, '127.0.0.1', 4711)
+    with static_peer(self):
         time.sleep(.1)
         local_udp_ports = [
             int(line.split()[1].split(':')[1], base=16)
@@ -87,8 +84,7 @@ def test_immediate_dht(static_peer, uri, timeout):
     ) as mock, static_peer(
         self, predecessor, successor,
     ), contextlib.closing(
-        # Use `http.client` instead of `urllib` to avoid redirection
-        HTTPConnection(self.ip, self.port, timeout)
+        HTTPConnection(self.ip, self.port, timeout)  # Use `http.client` instead of `urllib` to avoid redirection
     ) as conn:
         conn.connect()
 
@@ -98,8 +94,7 @@ def test_immediate_dht(static_peer, uri, timeout):
         _ = reply.read()
 
         uri_hash = dht.hash(f'/{uri}'.encode('latin1'))
-        implementation_responsible = not (
-            self.id < uri_hash < successor.id)  # Fix off-by-one error
+        implementation_responsible = not self.id < uri_hash <= successor.id
 
         if implementation_responsible:
             assert reply.status == 404, "Server should've indicated missing data"
@@ -107,11 +102,9 @@ def test_immediate_dht(static_peer, uri, timeout):
             assert reply.status == 303, "Server should've delegated response"
             assert reply.headers['Location'] == f'http://{successor.ip}:{successor.port}/{uri}', "Server should've delegated to its successor"
 
-        assert util.bytes_available(
-            mock) == 0, "Data received on successor socket"
+        assert util.bytes_available(mock) == 0, "Data received on successor socket"
 
 
-# TODO swap with previous test?
 @pytest.mark.parametrize("uri", ['a', 'b'])
 def test_lookup_sent(static_peer, uri, timeout):
     """Test for lookup to correct peer
@@ -124,8 +117,7 @@ def test_lookup_sent(static_peer, uri, timeout):
     self = dht.Peer(0x0000, '127.0.0.1', 4711)
     successor = dht.Peer(0x0001, '127.0.0.1', 4712)
 
-    # Can't differentiate predecessor & successor, reusing ports.
-    with dht.peer_socket(successor) as mock:
+    with dht.peer_socket(successor) as mock:  # Can't differentiate predecessor & successor, reusing ports.
         with static_peer(
             self, predecessor, successor
         ), pytest.raises(req.HTTPError) as exception_info:
@@ -134,19 +126,15 @@ def test_lookup_sent(static_peer, uri, timeout):
             req.urlopen(url, timeout=timeout)
 
         assert exception_info.value.status == 503, "Server should reply with 503"
-        assert exception_info.value.headers.get(
-            "Retry-After", None) == "1", "Server should set 'Retry-After' header to 1s"
+        assert exception_info.value.headers.get("Retry-After", None) == "1", "Server should set 'Retry-After' header to 1s"
 
         time.sleep(.1)
-        assert util.bytes_available(
-            mock) > 0, "No data received on successor socket"
+        assert util.bytes_available(mock) > 0, "No data received on successor socket"
         data = mock.recv(1024)
-        assert len(data) == struct.calcsize(
-            dht.message_format), "Received message has invalid length for DHT message"
+        assert len(data) == struct.calcsize(dht.message_format), "Received message has invalid length for DHT message"
         msg = dht.deserialize(data)
 
-        assert dht.Flags(
-            msg.flags) == dht.Flags.lookup, "Received message should be a lookup"
+        assert dht.Flags(msg.flags) == dht.Flags.lookup, "Received message should be a lookup"
 
         uri_hash = dht.hash(urlparse(url).path.encode('latin1'))
         assert msg.id == uri_hash, "Received lookup should query the requested datum's hash"
@@ -173,17 +161,13 @@ def test_lookup_reply(static_peer):
 
         time.sleep(.1)
 
-        assert util.bytes_available(
-            succ_mock) == 0, "Data received on successor socket"
-        assert util.bytes_available(
-            pred_mock) > 0, "No data received on predecessor socket"
+        assert util.bytes_available(succ_mock) == 0, "Data received on successor socket"
+        assert util.bytes_available(pred_mock) > 0, "No data received on predecessor socket"
         data = pred_mock.recv(1024)
-        assert len(data) == struct.calcsize(
-            dht.message_format), "Received message has invalid length for DHT message"
+        assert len(data) == struct.calcsize(dht.message_format), "Received message has invalid length for DHT message"
         reply = dht.deserialize(data)
 
-        assert dht.Flags(
-            reply.flags) == dht.Flags.reply, "Received message should be a reply"
+        assert dht.Flags(reply.flags) == dht.Flags.reply, "Received message should be a reply"
         assert reply.peer == successor, "Reply does not indicate successor as responsible"
         assert reply.id == self.id, "Reply does not indicate implementation as previous ID"
 
@@ -207,13 +191,10 @@ def test_lookup_forward(static_peer):
 
         time.sleep(.1)
 
-        assert util.bytes_available(
-            pred_mock) == 0, "Data received on predecessor socket"
-        assert util.bytes_available(
-            succ_mock) > 0, "No data received on successor socket"
+        assert util.bytes_available(pred_mock) == 0, "Data received on predecessor socket"
+        assert util.bytes_available(succ_mock) > 0, "No data received on successor socket"
         data = succ_mock.recv(1024)
-        assert len(data) == struct.calcsize(
-            dht.message_format), "Received message has invalid length for DHT message"
+        assert len(data) == struct.calcsize(dht.message_format), "Received message has invalid length for DHT message"
         received = dht.deserialize(data)
 
         assert received == lookup, "Received message should be equal to original lookup"
@@ -238,8 +219,7 @@ def test_lookup_complete(static_peer, uri, timeout):
     ), dht.peer_socket(
         successor
     ) as succ_mock, contextlib.closing(
-        # We have to use the more low-level `http.client` instead of `urllib` to avoid it interpreting the `Retry-After` header
-        HTTPConnection(self.ip, self.port, timeout)
+        HTTPConnection(self.ip, self.port, timeout)  # We have to use the more low-level `http.client` instead of `urllib` to avoid it interpreting the `Retry-After` header
     ) as conn:
         conn.connect()
         time.sleep(.1)
@@ -250,24 +230,19 @@ def test_lookup_complete(static_peer, uri, timeout):
         response = conn.getresponse()
         _ = response.read()
         assert response.status == 503, "Server should reply with 503"
-        assert response.headers.get(
-            "Retry-After", None) == "1", "Server should set 'Retry-After' header to 1s"
+        assert response.headers.get("Retry-After", None) == "1", "Server should set 'Retry-After' header to 1s"
         time.sleep(.1)
 
         # Check lookup message
         time.sleep(.1)
-        assert util.bytes_available(
-            pred_mock) == 0, "Data received on predecessor socket"
-        assert util.bytes_available(
-            succ_mock) > 0, "No data received on successor socket"
+        assert util.bytes_available(pred_mock) == 0, "Data received on predecessor socket"
+        assert util.bytes_available(succ_mock) > 0, "No data received on successor socket"
         data = succ_mock.recv(1024)
-        assert len(data) == struct.calcsize(
-            dht.message_format), "Received message has invalid length for DHT message"
+        assert len(data) == struct.calcsize(dht.message_format), "Received message has invalid length for DHT message"
         msg = dht.deserialize(data)
 
         time.sleep(.1)
-        assert dht.Flags(
-            msg.flags) == dht.Flags.lookup, "Received message should be a lookup"
+        assert dht.Flags(msg.flags) == dht.Flags.lookup, "Received message should be a lookup"
 
         uri_hash = dht.hash(f'/{uri}'.encode('latin1'))
         assert msg.id == uri_hash, "Received lookup should query the requested datum's hash"
@@ -325,26 +300,20 @@ def test_dht(static_peer):
 
         # Create datum
         contact = peers[contact_order[1]]
-        reply = util.urlopen(req.Request(
-            f'http://{contact.ip}:{contact.port}/dynamic/{datum}', data=content, method='PUT'))
+        reply = util.urlopen(req.Request(f'http://{contact.ip}:{contact.port}/dynamic/{datum}', data=content, method='PUT'))
         assert reply.status == 201, f"Creation of '/dynamic/{datum}' did not yield '201'"
 
         # Ensure datum exists
         contact = peers[contact_order[2]]
-        reply = util.urlopen(
-            f'http://{contact.ip}:{contact.port}/dynamic/{datum}')
+        reply = util.urlopen(f'http://{contact.ip}:{contact.port}/dynamic/{datum}')
         assert reply.status == 200
-        assert reply.read(
-        ) == content, f"Content of '/dynamic/{datum}' does not match what was passed"
+        assert reply.read() == content, f"Content of '/dynamic/{datum}' does not match what was passed"
 
         # Delete datum
         contact = peers[contact_order[3]]
-        # Determine correct URL
-        real_url = util.urlopen(
-            f'http://{contact.ip}:{contact.port}/dynamic/{datum}').geturl()
+        real_url = util.urlopen(f'http://{contact.ip}:{contact.port}/dynamic/{datum}').geturl()  # Determine correct URL
         reply = util.urlopen(req.Request(real_url, method='DELETE'))
-        assert reply.status in {
-            200, 202, 204}, f"Deletion of '/dynamic/{datum}' did not succeed"
+        assert reply.status in {200, 202, 204}, f"Deletion of '/dynamic/{datum}' did not succeed"
 
         # Ensure datum is missing
         contact = peers[contact_order[4]]
