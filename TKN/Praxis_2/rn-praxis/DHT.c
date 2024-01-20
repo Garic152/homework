@@ -10,7 +10,6 @@
 #include "DHT.h"
 
 uint16_t hash(const char *str) {
-  LOG(LOG_LEVEL_INFO, "Hashing: %s\n", str);
   uint8_t digest[SHA256_DIGEST_LENGTH];
   SHA256((uint8_t *)str, strlen(str), digest);
   return htons(*((uint32_t *)digest));
@@ -55,7 +54,7 @@ int send_message(struct LookupMessage *message, struct Destination destination,
 int send_lookup(struct LookupMessage *message, struct Destination destination,
                 int sockfd) {
   LOG(LOG_LEVEL_INFO,
-      "Now sending message from node %u into dht on socket: %u\n",
+      "Now sending message from node %u into dht on socket: %u",
       message->node_port, sockfd);
   struct LookupMessage reply;
   struct sockaddr_in nodeAddr;
@@ -74,7 +73,7 @@ int send_lookup(struct LookupMessage *message, struct Destination destination,
     perror("send_message");
   }
 
-  printf("Now trying to receive on socket %d\n", sockfd);
+  LOG(LOG_LEVEL_INFO, "Now trying to receive on socket %d", sockfd);
   // Wait for reply
   int received_bytes = recvfrom(sockfd, buffer, 1024, 0,
                                 (struct sockaddr *)&nodeAddr, &addr_len);

@@ -91,7 +91,7 @@ int findEntry(DHT_History *history, uint32_t *resource, DHT_Entry *result) {
 void send_reply(int conn, struct request *request, DHT_NODE *node,
                 DHT_History *history) {
 
-  LOG(LOG_LEVEL_DEBUG, "Entering send_reply for connection %d\n", conn);
+  LOG(LOG_LEVEL_DEBUG, "Entering send_reply for connection %d", conn);
 
   // Create a buffer to hold the HTTP reply
   char buffer[HTTP_MAX_SIZE];
@@ -101,10 +101,10 @@ void send_reply(int conn, struct request *request, DHT_NODE *node,
           request->method, request->uri, request->payload_length);
 
   if (is_responsible(node->current.id, node->predecessor.id, request->hash)) {
-    LOG(LOG_LEVEL_INFO, "Node is responsible for the request\n");
+    LOG(LOG_LEVEL_INFO, "Node is responsible for the request");
 
     if (strcmp(request->method, "GET") == 0) {
-      LOG(LOG_LEVEL_DEBUG, "Handling GET request for URI: %s\n", request->uri);
+      LOG(LOG_LEVEL_DEBUG, "Handling GET request for URI: %s", request->uri);
       // Find the resource with the given URI in the 'resources' array.
       size_t resource_length;
       const char *resource =
@@ -117,7 +117,7 @@ void send_reply(int conn, struct request *request, DHT_NODE *node,
         reply = "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\n\r\n";
       }
     } else if (strcmp(request->method, "PUT") == 0) {
-      LOG(LOG_LEVEL_DEBUG, "Handling PUT request for URI: %s\n", request->uri);
+      LOG(LOG_LEVEL_DEBUG, "Handling PUT request for URI: %s", request->uri);
       // Try to set the requested resource with the given payload in the
       // 'resources' array.
       if (set(request->uri, request->payload, request->payload_length,
@@ -138,10 +138,10 @@ void send_reply(int conn, struct request *request, DHT_NODE *node,
     }
   } else {
     LOG(LOG_LEVEL_INFO,
-        "Node is not responsible, performing lookup or sending 503\n");
+        "Node is not responsible, performing lookup or sending 503");
     DHT_Entry entry;
     if (findEntry(history, &request->hash, &entry)) {
-      LOG(LOG_LEVEL_INFO, "Lookup successful for hash: %u\n", request->hash);
+      LOG(LOG_LEVEL_INFO, "Lookup successful for hash: %u", request->hash);
 
       // Handle IP adress
       char ip_str[32];
@@ -154,7 +154,7 @@ void send_reply(int conn, struct request *request, DHT_NODE *node,
     } else {
       LOG(LOG_LEVEL_WARN,
           "Sending 503 Service Unavailable for hash and performing lookup: "
-          "%u\n",
+          "%u",
           request->hash);
 
       // Copy lookup information into message struct
@@ -173,7 +173,7 @@ void send_reply(int conn, struct request *request, DHT_NODE *node,
                      "5\r\nContent-Length: 0\r\n\r\n");
 
       if ((send_lookup(&message, destination, udp_socket)) < 0) {
-        LOG(LOG_LEVEL_ERROR, "Failed to send or receive on lookup\n");
+        LOG(LOG_LEVEL_ERROR, "Failed to send or receive on lookup");
         perror("Send lookup");
       } else {
         // Handle IP adress
@@ -186,14 +186,14 @@ void send_reply(int conn, struct request *request, DHT_NODE *node,
     }
   }
 
-  LOG(LOG_LEVEL_INFO, "Sending reply: %s\n", reply);
+  LOG(LOG_LEVEL_INFO, "Sending reply: %s", reply);
   // Send the reply back to the client
   if (send(conn, reply, strlen(reply), 0) == -1) {
     perror("send");
-    LOG(LOG_LEVEL_ERROR, "Failed to send reply on connection %d\n", conn);
+    LOG(LOG_LEVEL_ERROR, "Failed to send reply on connection %d", conn);
     close(conn);
   }
-  LOG(LOG_LEVEL_DEBUG, "Exiting send_reply for connection %d\n", conn);
+  LOG(LOG_LEVEL_DEBUG, "Exiting send_reply for connection %d", conn);
 }
 
 /**
@@ -359,10 +359,6 @@ static struct sockaddr_in derive_sockaddr(const char *host, const char *port) {
  * @return The file descriptor of the created TCP server socket.
  */
 static int setup_server_socket(struct sockaddr_in addr, int is_udp) {
-  LOG(LOG_LEVEL_DEBUG, "IS_UDP: %d\n", is_udp);
-  LOG(LOG_LEVEL_INFO, "IS_UDP: %d\n", is_udp);
-  LOG(LOG_LEVEL_WARN, "IS_UDP: %d\n", is_udp);
-  LOG(LOG_LEVEL_ERROR, "IS_UDP: %d\n", is_udp);
   const int enable = 1;
   const int backlog = 1;
 
@@ -557,11 +553,11 @@ int main(int argc, char **argv) {
         if (received_bytes == -1) {
           perror("recfrom");
           LOG(LOG_LEVEL_DEBUG,
-              "Didnt receive udp data, now closing socket: %u\n",
+              "Didnt receive udp data, now closing socket: %u",
               events[i].data.fd);
           close(events[i].data.fd);
         } else if (received_bytes == sizeof(struct LookupMessage)) {
-          LOG(LOG_LEVEL_DEBUG, "Received UDP data on sock: %u\n",
+          LOG(LOG_LEVEL_DEBUG, "Received UDP data on sock: %u",
               events[i].data.fd);
           struct LookupMessage *message = (struct LookupMessage *)buffer;
 
