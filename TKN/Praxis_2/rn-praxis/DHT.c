@@ -19,11 +19,9 @@ bool is_responsible(uint32_t current_id, uint32_t predecessor_id,
                     uint32_t hash) {
   LOG(LOG_LEVEL_DEBUG, "Entering is_responsible");
   if (current_id > predecessor_id) {
-    LOG(LOG_LEVEL_INFO, "Node is responsible for resource");
-    return hash < current_id && hash > predecessor_id;
+    return hash <= current_id && hash > predecessor_id;
   } else {
-    LOG(LOG_LEVEL_INFO, "Node is NOT responsible for resource");
-    return hash < current_id || hash > predecessor_id;
+    return hash <= current_id || hash > predecessor_id;
   }
 }
 
@@ -113,8 +111,7 @@ int receive_lookup(struct LookupMessage *message, DHT_NODE *node, int sockfd) {
   LOG(LOG_LEVEL_DEBUG, "Entering receive_lookup");
   struct Destination destination;
 
-  if (message->hash_id <= node->current.id &&
-      message->hash_id > node->predecessor.id) {
+  if (is_responsible(node->successor.id, node->current.id, message->hash_id)) {
 
     LOG(LOG_LEVEL_INFO, "Current node %s is responsible for the resource",
         node->current.port);
@@ -125,9 +122,9 @@ int receive_lookup(struct LookupMessage *message, DHT_NODE *node, int sockfd) {
 
     // Node is responsible, send information back to origin node
     message->message_type = 1;
-    message->node_id = node->current.id;
-    message->node_port = atoi(node->current.port);
-    message->node_ip = inet_addr(node->current.ip);
+    message->node_id = node->successor.id;
+    message->node_port = atoi(node->successor.port);
+    message->node_ip = inet_addr(node->successor.ip);
 
     if (send_message(message, destination, sockfd) < 0) {
       perror("send message responsible");
@@ -136,8 +133,10 @@ int receive_lookup(struct LookupMessage *message, DHT_NODE *node, int sockfd) {
     return 0;
   } else {
     LOG(LOG_LEVEL_INFO,
-        "Current node %s is NOT responsible for the resource, sending to %s",
-        node->current.port, node->successor.port);
+        "Current node %s with id %u is NOT responsible for the resource %u, "
+        "sending to %s",
+        node->current.port, node->current.id, message->hash_id,
+        node->successor.port);
 
     // Node is not responsible, send information to next node
     destination.node_ip = inet_addr(node->successor.ip);
