@@ -152,7 +152,7 @@ void send_reply(int conn, struct request *request, DHT_NODE *node,
               "Other\r\nLocation:http://%s:%d%s\r\nContent-Length: 0\r\n\r\n",
               ip_str, entry.port, request->uri);
     } else {
-      LOG(LOG_LEVEL_WARN,
+      LOG(LOG_LEVEL_INFO,
           "Sending 503 Service Unavailable for hash and performing lookup: "
           "%u",
           request->hash);
@@ -552,8 +552,7 @@ int main(int argc, char **argv) {
                      (struct sockaddr *)&sender_addr, &sender_addr_len);
         if (received_bytes == -1) {
           perror("recfrom");
-          LOG(LOG_LEVEL_DEBUG,
-              "Didnt receive udp data, now closing socket: %u",
+          LOG(LOG_LEVEL_DEBUG, "Didnt receive udp data, now closing socket: %u",
               events[i].data.fd);
           close(events[i].data.fd);
         } else if (received_bytes == sizeof(struct LookupMessage)) {

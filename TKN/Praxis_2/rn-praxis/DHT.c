@@ -17,9 +17,12 @@ uint16_t hash(const char *str) {
 
 bool is_responsible(uint32_t current_id, uint32_t predecessor_id,
                     uint32_t hash) {
+  LOG(LOG_LEVEL_DEBUG, "Entering is_responsible");
   if (current_id > predecessor_id) {
+    LOG(LOG_LEVEL_INFO, "Node is responsible for resource");
     return hash < current_id && hash > predecessor_id;
   } else {
+    LOG(LOG_LEVEL_INFO, "Node is NOT responsible for resource");
     return hash < current_id || hash > predecessor_id;
   }
 }
@@ -53,8 +56,8 @@ int send_message(struct LookupMessage *message, struct Destination destination,
 
 int send_lookup(struct LookupMessage *message, struct Destination destination,
                 int sockfd) {
-  LOG(LOG_LEVEL_INFO,
-      "Now sending message from node %u into dht on socket: %u",
+  LOG(LOG_LEVEL_DEBUG, "Entering send_lookup");
+  LOG(LOG_LEVEL_INFO, "Now sending message from node %u into dht on socket: %u",
       message->node_port, sockfd);
   struct LookupMessage reply;
   struct sockaddr_in nodeAddr;
@@ -78,6 +81,7 @@ int send_lookup(struct LookupMessage *message, struct Destination destination,
   int received_bytes = recvfrom(sockfd, buffer, 1024, 0,
                                 (struct sockaddr *)&nodeAddr, &addr_len);
   if (received_bytes == -1) {
+    LOG(LOG_LEVEL_WARN, "ERROR RECEIVING MESSAGE");
     perror("recfrom");
     close(sockfd);
   } else if (received_bytes == sizeof(struct LookupMessage)) {
@@ -89,22 +93,31 @@ int send_lookup(struct LookupMessage *message, struct Destination destination,
     received_message->node_id = ntohl(received_message->node_id);
     received_message->node_port = ntohs(received_message->node_port);
 
+    LOG(LOG_LEVEL_INFO, "Successfully received message from node %d",
+        received_message->node_port);
+
     *message = *received_message;
 
     // close(sockfd);
     return 0;
   } else {
     // close(sockfd);
+    perror("receive error bottom");
     return -1;
   }
+  perror("receive error bottom");
   return -1;
 }
 
 int receive_lookup(struct LookupMessage *message, DHT_NODE *node, int sockfd) {
+  LOG(LOG_LEVEL_DEBUG, "Entering receive_lookup");
   struct Destination destination;
 
   if (message->hash_id <= node->current.id &&
       message->hash_id > node->predecessor.id) {
+
+    LOG(LOG_LEVEL_INFO, "Current node %s is responsible for the resource",
+        node->current.port);
 
     // Redefine destination to root node
     destination.node_port = message->node_port;
@@ -117,14 +130,20 @@ int receive_lookup(struct LookupMessage *message, DHT_NODE *node, int sockfd) {
     message->node_ip = inet_addr(node->current.ip);
 
     if (send_message(message, destination, sockfd) < 0) {
+      perror("send message responsible");
       return -1;
     }
     return 0;
   } else {
+    LOG(LOG_LEVEL_INFO,
+        "Current node %s is NOT responsible for the resource, sending to %s",
+        node->current.port, node->successor.port);
+
     // Node is not responsible, send information to next node
     destination.node_ip = inet_addr(node->successor.ip);
     destination.node_port = atoi(node->successor.port);
     if (send_message(message, destination, sockfd) < 0) {
+      perror("send message not responsible");
       return -1;
     }
     return 0;
