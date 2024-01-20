@@ -100,7 +100,7 @@ void send_reply(int conn, struct request *request, DHT_NODE *node,
   fprintf(stderr, "Handling %s request for %s (%lu byte payload)\n",
           request->method, request->uri, request->payload_length);
 
-  if (is_responsible(node->current.id, node->predecessor.id, request->hash)) {
+  if (is_responsible(node->current.id, node->successor.id, request->hash)) {
     LOG(LOG_LEVEL_INFO, "Node is responsible for the request");
 
     if (strcmp(request->method, "GET") == 0) {
@@ -193,7 +193,7 @@ void send_reply(int conn, struct request *request, DHT_NODE *node,
     LOG(LOG_LEVEL_ERROR, "Failed to send reply on connection %d", conn);
     close(conn);
   }
-  LOG(LOG_LEVEL_DEBUG, "Exiting send_reply for connection %d", conn);
+  LOG(LOG_LEVEL_DEBUG, "Exiting send_reply for connection %d \n\n\n", conn);
 }
 
 /**
