@@ -359,6 +359,10 @@ static struct sockaddr_in derive_sockaddr(const char *host, const char *port) {
  * @return The file descriptor of the created TCP server socket.
  */
 static int setup_server_socket(struct sockaddr_in addr, int is_udp) {
+  LOG(LOG_LEVEL_DEBUG, "IS_UDP: %d\n", is_udp);
+  LOG(LOG_LEVEL_INFO, "IS_UDP: %d\n", is_udp);
+  LOG(LOG_LEVEL_WARN, "IS_UDP: %d\n", is_udp);
+  LOG(LOG_LEVEL_ERROR, "IS_UDP: %d\n", is_udp);
   const int enable = 1;
   const int backlog = 1;
 

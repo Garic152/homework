@@ -10,6 +10,7 @@
 #include "DHT.h"
 
 uint16_t hash(const char *str) {
+  LOG(LOG_LEVEL_INFO, "Hashing: %s\n", str);
   uint8_t digest[SHA256_DIGEST_LENGTH];
   SHA256((uint8_t *)str, strlen(str), digest);
   return htons(*((uint32_t *)digest));
