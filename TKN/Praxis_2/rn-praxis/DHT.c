@@ -110,8 +110,8 @@ int receive_lookup(struct LookupMessage *message, DHT_NODE *node, int sockfd) {
   struct Destination destination;
 
   if (is_responsible(node->successor.id, node->current.id, message->hash_id)) {
-    LOG(LOG_LEVEL_INFO, "Successor node %d is responsible for the resource",
-        node->successor.id);
+    LOG(LOG_LEVEL_INFO, "Successor node %s is responsible for the resource %d",
+        node->successor.port, node->successor.id);
 
     // Redefine destination to root node
     destination.node_port = message->node_port;
@@ -134,7 +134,7 @@ int receive_lookup(struct LookupMessage *message, DHT_NODE *node, int sockfd) {
   LOG(LOG_LEVEL_INFO,
       "NodePort %s with id %u is NOT responsible for the resource %u, "
       "sending to %u with NodePort %s",
-      node->current.port, node->current.id, message->hash_id,
+      node->successor.port, node->successor.id, message->hash_id,
       node->successor.id, node->successor.port);
 
   destination.node_ip = inet_addr(node->successor.ip);

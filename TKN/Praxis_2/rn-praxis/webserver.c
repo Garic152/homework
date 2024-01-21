@@ -91,6 +91,8 @@ int16_t findEntry(DHT_History *history, uint16_t *resource, DHT_Entry *result) {
 void send_reply(int conn, struct request *request, DHT_NODE *node,
                 DHT_History *history) {
 
+  LOG(LOG_LEVEL_DEBUG, "SEND REPLY RESOURCE: %d", history->entries[0].resource);
+
   LOG(LOG_LEVEL_DEBUG, "Entering send_reply for connection %d", conn);
 
   // Create a buffer to hold the HTTP reply
@@ -195,9 +197,9 @@ void send_reply(int conn, struct request *request, DHT_NODE *node,
         char ip_str[32];
         inet_ntop(AF_INET, &(message.node_ip), ip_str, 32);
 
-        addEntry(history, &message.node_ip, &message.hash_id,
-                 &message.node_port);
-
+        addEntry(history, &message.node_ip, &request->hash, &message.node_port);
+        LOG(LOG_LEVEL_INFO, "Sending 303 from node %s after the lookup",
+            node->current.port)
         sprintf(
             reply,
             "HTTP/1.1 303 See "
