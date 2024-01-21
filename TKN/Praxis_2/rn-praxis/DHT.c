@@ -39,8 +39,8 @@ int send_message(struct LookupMessage *message, struct Destination destination,
 
   // Convert the message to network byte order
   message->message_type = htonl(message->message_type);
-  message->hash_id = htonl(message->hash_id);
-  message->node_id = htonl(message->node_id);
+  message->hash_id = htons(message->hash_id);
+  message->node_id = htons(message->node_id);
   message->node_port = htons(message->node_port);
 
   if (sendto(sockfd, message, sizeof(*message), 0, (struct sockaddr *)&nodeAddr,
@@ -87,8 +87,8 @@ int send_lookup(struct LookupMessage *message, struct Destination destination,
 
     // Convert received message from network byte order to host byte order
     received_message->message_type = ntohl(received_message->message_type);
-    received_message->hash_id = ntohl(received_message->hash_id);
-    received_message->node_id = ntohl(received_message->node_id);
+    received_message->hash_id = ntohs(received_message->hash_id);
+    received_message->node_id = ntohs(received_message->node_id);
     received_message->node_port = ntohs(received_message->node_port);
 
     LOG(LOG_LEVEL_INFO, "Successfully received message from node %d",
@@ -133,8 +133,8 @@ int receive_lookup(struct LookupMessage *message, DHT_NODE *node, int sockfd) {
   }
 
   if (is_responsible(node->successor.id, node->current.id, message->hash_id)) {
-    LOG(LOG_LEVEL_INFO, "Current node %s is responsible for the resource",
-        node->successor.port);
+    LOG(LOG_LEVEL_INFO, "Successor node %d is responsible for the resource",
+        node->successor.id);
 
     // Redefine destination to root node
     destination.node_port = message->node_port;

@@ -562,8 +562,8 @@ int main(int argc, char **argv) {
 
           // Convert received message from network byte order to host byte order
           message->message_type = ntohl(message->message_type);
-          message->hash_id = ntohl(message->hash_id);
-          message->node_id = ntohl(message->node_id);
+          message->hash_id = ntohs(message->hash_id);
+          message->node_id = ntohs(message->node_id);
           message->node_port = ntohs(message->node_port);
 
           // Handle IP adress
