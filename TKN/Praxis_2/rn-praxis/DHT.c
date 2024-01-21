@@ -17,7 +17,7 @@ uint16_t hash(const char *str) {
 
 bool is_responsible(uint16_t current_id, uint16_t predecessor_id,
                     uint16_t hash) {
-  LOG(LOG_LEVEL_DEBUG, "Entering is_responsible");
+  LOG(LOG_LEVEL_DEBUG, "Entering is_responsible, %d", current_id);
   if (current_id > predecessor_id) {
     return hash <= current_id && hash > predecessor_id;
   } else {
@@ -108,12 +108,12 @@ int send_lookup(struct LookupMessage *message, struct Destination destination,
 }
 
 int receive_lookup(struct LookupMessage *message, DHT_NODE *node, int sockfd) {
-  LOG(LOG_LEVEL_DEBUG, "Entering receive_lookup");
+  LOG(LOG_LEVEL_DEBUG, "Entering receive_lookup, Current ID: %d, Hash: %d", node->current.id, message->hash_id);
   struct Destination destination;
 
   if (is_responsible(node->current.id, node->predecessor.id, message->hash_id)) {
-    LOG(LOG_LEVEL_INFO, "Current node %s is responsible for the resource",
-        node->current.port);
+    LOG(LOG_LEVEL_INFO, "Current node %s is responsible for the resource %d",
+        node->current.port, message->hash_id);
 
     // Redefine destination to root node
     destination.node_port = message->node_port;
