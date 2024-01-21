@@ -38,7 +38,6 @@ int send_message(struct LookupMessage *message, struct Destination destination,
   nodeAddr.sin_addr.s_addr = destination.node_ip;
 
   // Convert the message to network byte order
-  message->message_type = htonl(message->message_type);
   message->hash_id = htons(message->hash_id);
   message->node_id = htons(message->node_id);
   message->node_port = htons(message->node_port);
@@ -86,7 +85,6 @@ int send_lookup(struct LookupMessage *message, struct Destination destination,
     struct LookupMessage *received_message = (struct LookupMessage *)buffer;
 
     // Convert received message from network byte order to host byte order
-    received_message->message_type = ntohl(received_message->message_type);
     received_message->hash_id = ntohs(received_message->hash_id);
     received_message->node_id = ntohs(received_message->node_id);
     received_message->node_port = ntohs(received_message->node_port);
@@ -121,6 +119,7 @@ int receive_lookup(struct LookupMessage *message, DHT_NODE *node, int sockfd) {
 
     // Node is responsible, send information back to origin node
     message->message_type = 1;
+    message->hash_id = node->predecessor.id;
     message->node_id = node->current.id;
     message->node_port = atoi(node->current.port);
     message->node_ip = inet_addr(node->current.ip);
@@ -142,6 +141,7 @@ int receive_lookup(struct LookupMessage *message, DHT_NODE *node, int sockfd) {
 
     // Node is responsible, send information back to origin node
     message->message_type = 1;
+    message->hash_id = node->current.id;
     message->node_id = node->successor.id;
     message->node_port = atoi(node->successor.port);
     message->node_ip = inet_addr(node->successor.ip);

@@ -170,9 +170,11 @@ def test_lookup_reply(static_peer):
         assert len(data) == struct.calcsize(dht.message_format), "Received message has invalid length for DHT message"
         reply = dht.deserialize(data)
 
+        print(reply)
+
         assert reply.peer == successor, "Reply does not indicate successor as responsible"
-        assert reply.id == self.id, "Reply does not indicate implementation as previous ID"
         assert dht.Flags(reply.flags) == dht.Flags.reply, "Received message should be a reply"
+        assert reply.id == self.id, "Reply does not indicate implementation as previous ID"
 
 
 def test_lookup_forward(static_peer):
