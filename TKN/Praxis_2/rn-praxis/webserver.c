@@ -197,6 +197,12 @@ void send_reply(int conn, struct request *request, DHT_NODE *node,
 
         addEntry(history, &message.node_ip, &message.hash_id,
                  &message.node_port);
+
+        sprintf(
+            reply,
+            "HTTP/1.1 303 See "
+            "Other\r\nLocation: http://%s:%d%s\r\nContent-Length: 0\r\n\r\n",
+            ip_str, message.node_port, request->uri);
       }
     }
   }
