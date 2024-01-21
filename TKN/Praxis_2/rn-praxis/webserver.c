@@ -101,7 +101,8 @@ void send_reply(int conn, struct request *request, DHT_NODE *node,
           request->method, request->uri, request->payload_length);
 
   if (is_responsible(node->current.id, node->predecessor.id, request->hash)) {
-    LOG(LOG_LEVEL_INFO, "Node is responsible for the request");
+    LOG(LOG_LEVEL_INFO, "Node %d is responsible for the request",
+        node->current.id);
 
     if (strcmp(request->method, "GET") == 0) {
       LOG(LOG_LEVEL_DEBUG, "Handling GET request for URI: %s", request->uri);
@@ -145,7 +146,8 @@ void send_reply(int conn, struct request *request, DHT_NODE *node,
 
   } else {
     LOG(LOG_LEVEL_INFO,
-        "Node is not responsible, performing lookup or sending 503");
+        "Node %d is not responsible, performing lookup or sending 503",
+        node->current.id);
     DHT_Entry entry;
     if (findEntry(history, &request->hash, &entry)) {
       LOG(LOG_LEVEL_INFO, "Lookup successful for hash: %u", request->hash);
@@ -178,6 +180,12 @@ void send_reply(int conn, struct request *request, DHT_NODE *node,
 
       sprintf(reply, "HTTP/1.1 503 Service Unavailable\r\nRetry-After: "
                      "1\r\nContent-Length: 0\r\n\r\n");
+
+      if (send(conn, reply, strlen(reply), 0) == -1) {
+        perror("send");
+        LOG(LOG_LEVEL_ERROR, "Failed to send reply on connection %d", conn);
+        close(conn);
+      }
 
       if ((send_lookup(&message, destination, udp_socket)) < 0) {
         LOG(LOG_LEVEL_ERROR, "Failed to send or receive on lookup");

@@ -19,9 +19,9 @@ bool is_responsible(uint16_t current_id, uint16_t predecessor_id,
                     uint16_t hash) {
   LOG(LOG_LEVEL_DEBUG, "Entering is_responsible, %d", current_id);
   if (current_id > predecessor_id) {
-    return hash <= current_id && hash > predecessor_id;
+    return hash < current_id && hash > predecessor_id;
   } else {
-    return hash <= current_id || hash > predecessor_id;
+    return hash < current_id || hash > predecessor_id;
   }
 }
 
