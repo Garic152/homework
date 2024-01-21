@@ -136,6 +136,13 @@ void send_reply(int conn, struct request *request, DHT_NODE *node,
     } else {
       reply = "HTTP/1.1 501 Method Not Supported\r\n\r\n";
     }
+  } else if (is_responsible(node->successor.id, node->current.id,
+                            request->hash)) {
+    sprintf(reply,
+            "HTTP/1.1 303 See "
+            "Other\r\nLocation:http://%s:%s%s\r\nContent-Length: 0\r\n\r\n",
+            node->successor.ip, node->successor.port, request->uri);
+
   } else {
     LOG(LOG_LEVEL_INFO,
         "Node is not responsible, performing lookup or sending 503");
