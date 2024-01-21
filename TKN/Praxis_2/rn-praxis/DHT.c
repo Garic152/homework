@@ -12,11 +12,11 @@
 uint16_t hash(const char *str) {
   uint8_t digest[SHA256_DIGEST_LENGTH];
   SHA256((uint8_t *)str, strlen(str), digest);
-  return htons(*((uint32_t *)digest));
+  return htons(*((uint16_t *)digest));
 }
 
-bool is_responsible(uint32_t current_id, uint32_t predecessor_id,
-                    uint32_t hash) {
+bool is_responsible(uint16_t current_id, uint16_t predecessor_id,
+                    uint16_t hash) {
   LOG(LOG_LEVEL_DEBUG, "Entering is_responsible");
   if (current_id > predecessor_id) {
     return hash <= current_id && hash > predecessor_id;

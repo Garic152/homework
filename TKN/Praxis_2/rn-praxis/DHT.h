@@ -31,22 +31,24 @@ extern int currentLogLevel;
             ##__VA_ARGS__);                                                    \
   }
 
+#pragma pack(1)
 struct LookupMessage {
-  int message_type;
-  uint32_t hash_id;
-  uint32_t node_id;
+  int8_t message_type;
+  uint16_t hash_id;
+  uint16_t node_id;
   in_addr_t node_ip;
-  int node_port;
+  int16_t node_port;
 };
+#pragma pack()
 
 struct Destination {
   in_addr_t node_ip;
-  int node_port;
+  int16_t node_port;
 };
 
 uint16_t hash(const char *str);
-bool is_responsible(uint32_t current_id, uint32_t predecessor_id,
-                    uint32_t hash);
+bool is_responsible(uint16_t current_id, uint16_t predecessor_id,
+                    uint16_t hash);
 int send_lookup(struct LookupMessage *message, struct Destination destination,
                 int sockfd);
 int receive_lookup(struct LookupMessage *message, DHT_NODE *node, int sockfd);

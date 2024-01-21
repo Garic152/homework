@@ -32,13 +32,13 @@ int udp_socket = -1;
 
 typedef struct {
   in_addr_t ip;
-  uint32_t resource;
-  int port;
+  uint16_t resource;
+  int16_t port;
 } DHT_Entry;
 
 typedef struct {
   DHT_Entry entries[10];
-  int current;
+  int16_t current;
 } DHT_History;
 
 struct tuple resources[MAX_RESOURCES] = {
@@ -62,8 +62,8 @@ void initialize_dht_history(DHT_History *history) {
   memset(history, 0, sizeof(DHT_History));
 }
 
-void addEntry(DHT_History *history, in_addr_t *ip, uint32_t *resource,
-              int *port) {
+void addEntry(DHT_History *history, in_addr_t *ip, uint16_t *resource,
+              int16_t *port) {
   history->entries[history->current].ip = *ip;
   history->entries[history->current].resource = *resource;
   history->entries[history->current].port = *port;
@@ -71,7 +71,7 @@ void addEntry(DHT_History *history, in_addr_t *ip, uint32_t *resource,
   history->current = (history->current + 1) % MAX_ENTRIES;
 }
 
-int findEntry(DHT_History *history, uint32_t *resource, DHT_Entry *result) {
+int16_t findEntry(DHT_History *history, uint16_t *resource, DHT_Entry *result) {
   for (int i = 0; i < MAX_ENTRIES; i++) {
     if (history->entries[i].resource == *resource) {
       *result = history->entries[i];
@@ -576,7 +576,7 @@ int main(int argc, char **argv) {
             LOG(LOG_LEVEL_ERROR, "receive lookup failed");
           };
         } else {
-          LOG(LOG_LEVEL_WARN, "RECEIVED WRONG UDP PACKAGE!");
+          LOG(LOG_LEVEL_WARN, "RECEIVED WRONG UDP PACKAGE! Bytes: %d, Expected: %d", received_bytes, sizeof(struct LookupMessage));
         }
       } else {
         int conn_fd = events[i].data.fd;

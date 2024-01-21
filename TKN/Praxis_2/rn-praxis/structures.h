@@ -10,7 +10,7 @@
 #include "data.h"
 
 typedef struct {
-  uint32_t id;
+  uint16_t id;
   // struct in_addr ip;
   const char *ip;
   // uint16_t port;

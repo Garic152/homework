@@ -21,7 +21,7 @@ struct header {
 struct request {
   string method;
   string uri;
-  uint32_t hash;
+  uint16_t hash;
   struct header headers[HTTP_MAX_HEADERS];
   char *payload;
   ssize_t payload_length;
