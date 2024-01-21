@@ -56,7 +56,6 @@ int send_lookup(struct LookupMessage *message, struct Destination destination,
   LOG(LOG_LEVEL_DEBUG, "Entering send_lookup");
   LOG(LOG_LEVEL_INFO, "Now sending message from node %u into dht on socket: %u",
       message->node_port, sockfd);
-  struct LookupMessage reply;
   struct sockaddr_in nodeAddr;
   socklen_t addr_len = sizeof(nodeAddr);
 
@@ -106,10 +105,12 @@ int send_lookup(struct LookupMessage *message, struct Destination destination,
 }
 
 int receive_lookup(struct LookupMessage *message, DHT_NODE *node, int sockfd) {
-  LOG(LOG_LEVEL_DEBUG, "Entering receive_lookup, Current ID: %d, Hash: %d", node->current.id, message->hash_id);
+  LOG(LOG_LEVEL_DEBUG, "Entering receive_lookup, Current ID: %d, Hash: %d",
+      node->current.id, message->hash_id);
   struct Destination destination;
 
-  if (is_responsible(node->current.id, node->predecessor.id, message->hash_id)) {
+  if (is_responsible(node->current.id, node->predecessor.id,
+                     message->hash_id)) {
     LOG(LOG_LEVEL_INFO, "Current node %s is responsible for the resource %d",
         node->current.port, message->hash_id);
 
@@ -151,7 +152,7 @@ int receive_lookup(struct LookupMessage *message, DHT_NODE *node, int sockfd) {
       return -1;
     }
     return 0;
-  } 
+  }
 
   LOG(LOG_LEVEL_INFO,
       "NodePort %s with id %u is NOT responsible for the resource %u, "

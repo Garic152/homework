@@ -149,7 +149,7 @@ void send_reply(int conn, struct request *request, DHT_NODE *node,
 
       sprintf(reply,
               "HTTP/1.1 303 See "
-              "Other\r\nLocation:http://%s:%d%s\r\nContent-Length: 0\r\n\r\n",
+              "Other\r\nLocation: http://%s:%d%s\r\nContent-Length: 0\r\n\r\n",
               ip_str, entry.port, request->uri);
     } else {
       LOG(LOG_LEVEL_INFO,
@@ -575,7 +575,9 @@ int main(int argc, char **argv) {
             LOG(LOG_LEVEL_ERROR, "receive lookup failed");
           };
         } else {
-          LOG(LOG_LEVEL_WARN, "RECEIVED WRONG UDP PACKAGE! Bytes: %d, Expected: %d", received_bytes, sizeof(struct LookupMessage));
+          LOG(LOG_LEVEL_WARN,
+              "RECEIVED WRONG UDP PACKAGE! Bytes: %d, Expected: %d",
+              received_bytes, sizeof(struct LookupMessage));
         }
       } else {
         int conn_fd = events[i].data.fd;
