@@ -3,7 +3,7 @@ def matrix_to_string(matrix):
     for row in matrix:
         row_string = ' '.join(str(elem) for elem in row)
         row_strings.append(row_string)
-    return ("'" + ', '.join(row_strings) + "'").replace(".0", "")
+    return ', '.join(row_strings).replace(".0", "")
 
 def string_to_matrix(A):
     rows = A.split(',')
