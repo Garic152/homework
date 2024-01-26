@@ -1,48 +1,61 @@
 def matrix_to_string(matrix):
+    '''
+    Takes any matrix in 2D array format and returns it as a string
+    '''
     row_strings = []
     for row in matrix:
-        row_string = ' '.join(str(elem) for elem in row)
+        row_string = ' '.join(str(int(elem)) for elem in row)
         row_strings.append(row_string)
-    return ', '.join(row_strings).replace(".0", "")
+    # "convert" floats to ints
+    return ', '.join(row_strings)
 
 def string_to_matrix(A):
+    '''
+    Takes any matrix A in string format and converts it to a 2D array
+    '''
     rows = A.split(',')
     matrice = [list(map(int, row.split())) for row in rows]
     return(matrice)
     
 def LU_decomposition(A):
+    '''
+    Takes a nxn matrix and returns the upper and lower triangle matrix
+    '''
     A = string_to_matrix(A)
     
     # m rows and n columns
     n = len(A)
     
     # define L as id matrix and U normally
-    L = [[1 if i == j else 0 for j in range(n)] for i in range(n)]
+    L = [[0] * n for _ in range(n)]
     U = [[0] * n for _ in range(n)]
     result = [[0] * n for _ in range(n)]
+
+    for i in range(n):
+        L[i][i] = 1.0
     
     for i in range(n):
         # calculation for U
-        for j in range(i, n):
+        for k in range(i, n):
             # define sum for calculations
             sum = 0
             
-            for k in range(i):
-                sum += L[i][k] * U[k][j]
+            for j in range(i):
+                sum += L[i][j] * U[j][k]
             
             # Set U matrix entry
-            U[i][j] = A[i][j] - sum
+            U[i][k] = A[i][k] - sum
             
         # calculation for L
-        for j in range(i, n):
+        for k in range(i + 1, n):
             # define sum for calculations
             sum = 0
             
-            for k in range(i):
-                sum += L[j][k] * U[k][i]
+            for j in range(i):
+                sum += L[k][j] * U[j][i]
             
             # Set U matrix entry
-            L[j][i] = (A[j][i] - sum) / U[i][i]
+            L[k][i] = (A[k][i] - sum) / U[i][i]
     
     # fill result matrix
     for i in range(n):
@@ -57,12 +70,14 @@ def LU_decomposition(A):
 
 
 def solve_LGS(A, B):
+    '''
+    Solves the equation Ax=B for any matrix pair A (nxn) and B (nxm)
+    '''
     A = string_to_matrix(A)
     B = string_to_matrix(B)
     
     n_A = len(A)
     
-    n_B = len(B)
     m_B = len(B[0])
     
     for i in range(n_A):
