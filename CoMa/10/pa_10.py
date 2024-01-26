@@ -4,7 +4,7 @@ def matrix_to_string(matrix):
     '''
     row_strings = []
     for row in matrix:
-        row_string = ' '.join(str(int(elem)) for elem in row)
+        row_string = ' '.join(str(int(round(elem))) for elem in row)
         row_strings.append(row_string)
     # "convert" floats to ints
     return ', '.join(row_strings)
@@ -17,15 +17,15 @@ def string_to_matrix(A):
     matrice = [list(map(int, row.split())) for row in rows]
     return(matrice)
     
-def LU_decomposition(A):
+def LU_decomposition_old(A):
     '''
     Takes a nxn matrix and returns the upper and lower triangle matrix
     '''
     A = string_to_matrix(A)
-    
+
     # m rows and n columns
     n = len(A)
-    
+
     # define L as id matrix and U normally
     L = [[0] * n for _ in range(n)]
     U = [[0] * n for _ in range(n)]
@@ -33,19 +33,19 @@ def LU_decomposition(A):
 
     for i in range(n):
         L[i][i] = 1
-    
+
     for i in range(n):
         # calculation for U
         for k in range(i, n):
             # define sum for calculations
             sum = 0
-            
+
             for j in range(i):
                 sum += L[i][j] * U[j][k]
-            
+
             # Set U matrix entry
             U[i][k] = A[i][k] - sum
-            
+
         # calculation for L
         for k in range(i + 1, n):
             # define sum for calculations
@@ -66,7 +66,36 @@ def LU_decomposition(A):
                 result[i][j] = U[i][j] + L[i][j]
                 
             
-    return matrix_to_string(result) 
+    return(', '.join([' '.join(map(lambda x: str(int(round(x))), list)) for list in result]))
+
+
+def LU_decomposition(A):
+
+    A = string_to_matrix(A)
+    
+    n = len(A)
+    L = [[0.0] * n for _ in range(n)]
+    U = [[0.0] * n for _ in range(n)]
+    result = [[0.0] * n for _ in range(n)]
+
+    for j in range(n):
+        L[j][j] = 1.0
+        for i in range(j+1):
+            s1 = sum(U[k][j] * L[i][k] for k in range(i))
+            U[i][j] = A[i][j] - s1
+
+        for i in range(j, n):
+            s2 = sum(U[k][j] * L[i][k] for k in range(j))
+            L[i][j] = (A[i][j] - s2) / U[j][j]
+    
+    for i in range(n):
+        for j in range(n):
+            if j == i:
+                result[i][j] = U[i][j]
+            else:
+                result[i][j] = U[i][j] + L[i][j]
+
+    return(', '.join([' '.join(map(lambda x: str(int(round(x))), list)) for list in result]))
 
 
 def solve_LGS(A, B):
@@ -99,6 +128,7 @@ def solve_LGS(A, B):
                 for p in range(m_B):
                     B[k][p] -= temp_sub * B[i][p]
         
-    return matrix_to_string(B)
+    return(', '.join([' '.join(map(lambda x: str(int(round(x))), list)) for list in B]))
+
     
-print(LU_decomposition('-2 -1, -8 -8'))
+print( LU_decomposition('17 4, -17 42'))
