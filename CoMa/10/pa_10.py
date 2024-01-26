@@ -4,7 +4,7 @@ def matrix_to_string(matrix):
     '''
     row_strings = []
     for row in matrix:
-        row_string = ' '.join(str(int(round(elem, 0))) for elem in row)
+        row_string = ' '.join(str(int(elem)) for elem in row)
         row_strings.append(row_string)
     # "convert" floats to ints
     return ', '.join(row_strings)
@@ -32,7 +32,7 @@ def LU_decomposition(A):
     result = [[0] * n for _ in range(n)]
 
     for i in range(n):
-        L[i][i] = 1.0
+        L[i][i] = 1
     
     for i in range(n):
         # calculation for U
@@ -101,4 +101,4 @@ def solve_LGS(A, B):
         
     return matrix_to_string(B)
     
-print(solve_LGS('-5 1 -3 -3, -15 5 -13 -11, 15 -13 27 21, 20 -6 22 3','4 -1, 40 -9, -150 17, -35 83'))
+print(LU_decomposition('-2 -1, -8 -8'))
