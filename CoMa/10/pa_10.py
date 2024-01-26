@@ -2,12 +2,7 @@ def matrix_to_string(matrix):
     '''
     Takes any matrix in 2D array format and returns it as a string
     '''
-    row_strings = []
-    for row in matrix:
-        row_string = ' '.join(str(int(round(elem))) for elem in row)
-        row_strings.append(row_string)
-    # "convert" floats to ints
-    return ', '.join(row_strings)
+    return [list(map(float, row.split())) for row in matrix.split(",")]
 
 def string_to_matrix(A):
     '''
@@ -16,64 +11,13 @@ def string_to_matrix(A):
     rows = A.split(',')
     matrice = [list(map(int, row.split())) for row in rows]
     return(matrice)
-    
-def LU_decomposition_old(A):
-    '''
-    Takes a nxn matrix and returns the upper and lower triangle matrix
-    '''
-    A = string_to_matrix(A)
-
-    # m rows and n columns
-    n = len(A)
-
-    # define L as id matrix and U normally
-    L = [[0] * n for _ in range(n)]
-    U = [[0] * n for _ in range(n)]
-    result = [[0] * n for _ in range(n)]
-
-    for i in range(n):
-        L[i][i] = 1
-
-    for i in range(n):
-        # calculation for U
-        for k in range(i, n):
-            # define sum for calculations
-            sum = 0
-
-            for j in range(i):
-                sum += L[i][j] * U[j][k]
-
-            # Set U matrix entry
-            U[i][k] = A[i][k] - sum
-
-        # calculation for L
-        for k in range(i + 1, n):
-            # define sum for calculations
-            sum = 0
-            
-            for j in range(i):
-                sum += L[k][j] * U[j][i]
-            
-            # Set U matrix entry
-            L[k][i] = (A[k][i] - sum) / U[i][i]
-    
-    # fill result matrix
-    for i in range(n):
-        for j in range(n):
-            if j == i:
-                result[i][j] = U[i][j]
-            else:
-                result[i][j] = U[i][j] + L[i][j]
-                
-            
-    return(', '.join([' '.join(map(lambda x: str(int(round(x))), list)) for list in result]))
-
 
 def LU_decomposition(A):
 
     A = string_to_matrix(A)
-    
+
     n = len(A)
+
     L = [[0.0] * n for _ in range(n)]
     U = [[0.0] * n for _ in range(n)]
     result = [[0.0] * n for _ in range(n)]
@@ -99,36 +43,36 @@ def LU_decomposition(A):
 
 
 def solve_LGS(A, B):
-    '''
-    Solves the equation Ax=B for any matrix pair A (nxn) and B (nxm)
-    '''
-    A = string_to_matrix(A)
+    A = LU_decomposition(A)
     B = string_to_matrix(B)
-    
-    n_A = len(A)
-    
-    m_B = len(B[0])
-    
-    for i in range(n_A):
-        diagonal_value = A[i][i]
-        
-        # adjust A
-        for j in range(n_A):
-            A[i][j] /= diagonal_value
-        # adjust B
-        for j in range(m_B):
-            B[i][j] /= diagonal_value
-        
-        # subract all other row values
-        for k in range(n_A):
-            if i != k:
-                temp_sub = A[k][i]
-                for p in range(n_A):
-                    A[k][p] -= temp_sub * A[i][p]
-                for p in range(m_B):
-                    B[k][p] -= temp_sub * B[i][p]
-        
-    return(', '.join([' '.join(map(lambda x: str(int(round(x))), list)) for list in B]))
+    A = string_to_matrix(A)
 
+    n = len(A)
+
+    L = [[0.0] * n for _ in range(n)]
+    U = [[0.0] * n for _ in range(n)]
+
+    for i in range(n):
+        for j in range(n):
+            if j >= i:
+                U[i][j] = A[i][j]
+            else:
+                L[i][j] = A[i][j]
+
+    solutions = [[] for _ in range(n)]
+
+    for b in zip(*B):
+        y = [0 for _ in range(n)]
+        for i in range(n):
+            y[i] = b[i] - sum(L[i][j] * y[j] for j in range(i))
+
+        x = [0 for _ in range(n)]
+        for i in range(n - 1, -1, -1):
+            x[i] = (y[i] - sum(U[i][j] * x[j] for j in range(i + 1, n))) / U[i][i]
+
+        for i in range(n):
+            solutions[i].append(x[i])
+
+    return(', '.join([' '.join(map(lambda x: str(int(round(x))), list)) for list in solutions]))
     
-print( LU_decomposition('17 4, -17 42'))
+print(solve_LGS('2 4 -7, -4 -7 13, 34 71 -131','-1 7, 2 -18, -26 116'))
