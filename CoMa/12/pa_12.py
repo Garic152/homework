@@ -25,7 +25,7 @@ def maxunimod(L):
             count += 1
 
         # check if number goes down
-        if L[i] <= L[i - 1]:
+        elif L[i] <= L[i - 1]:
             down = True
             count += 1
 
