@@ -61,6 +61,9 @@ def maxunimod(L):
 
     down = False
 
+    if len(L) <= 2:
+        return len(L)
+
     for i in range(len(L) - 1):
         end = i
 
@@ -91,4 +94,4 @@ def maxunimod(L):
 
     return max(ranges)
 
-# print(maxunimod([7, 2, 3, 0, 5, 4, 6, 5, 5, 9, 5, 1, 0, 5, 7, 8, 1, 7, 8, 3, 4, 8, 1, 4, 3, 3, 1, 9, 0, 0]))
+# print(maxunimod([7, 1, 0]))
