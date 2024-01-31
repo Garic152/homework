@@ -75,4 +75,4 @@ def solve_LGS(A, B):
 
     return(', '.join([' '.join(map(lambda x: str(int(round(x))), list)) for list in solutions]))
     
-print(solve_LGS('2 4 -7, -4 -7 13, 34 71 -131','-1 7, 2 -18, -26 116'))
+print(LU_decomposition('2 4 -7, -4 -7 13, 34 71 -131'))
