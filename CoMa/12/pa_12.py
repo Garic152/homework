@@ -2,7 +2,7 @@
 Returns the maximum length of a unimodular sequence for a given int-list L of length n ≥ 1.  
 '''
 
-def maxunimod(L):
+def maxunimod_old(L):
     '''
     Returns the maximum length of a unimodular sequence for a given int-list L of length n ≥ 1.  
     '''
@@ -18,40 +18,30 @@ def maxunimod(L):
         if L[i] == L[i - 1]:
             equal_count += 1
             count += 1
-            if (i == 1) or (i == len(L) - 1) and not edge:
-                equal_count -= 2
-                edge = True
-                count += 1
 
         # check if number goes up
         elif L[i] > L[i - 1]:
+            if i == 1 or i == len(L) - 1:
+                count += 1
+            
             # if number went down previously, start new cycle
             if down:
                 down = False
                 if count > length:
                     length = count
-                count = 1
+                count = 0
 
             # increase counter by 1
             count += 1
-            
-            if L[i - 1] < L[i - 2]:
-                count += equal_count
-                equal_count = 0
-
-            if (i == 1) or (i == len(L) - 1) and not edge:
-                edge = True
-                count += 1
 
         # check if number goes down
         elif L[i] < L[i - 1]:
+            if i == 1 or i == len(L) - 1:
+                count += 1
+
             down = True
             count += 1
 
-            if (i == 1) or (i == len(L) - 1) and not edge:
-                edge = True
-                count += 1
-            
             if L[i - 1] > L[i - 2]:
                 count += equal_count
                 equal_count = 0
@@ -60,4 +50,42 @@ def maxunimod(L):
         if i == len(L) - 1:
             if count > length:
                 length = count
+
     return length
+
+def maxunimod(L):
+    ranges = []
+    start = -1
+    end = 0
+    equal_count = 0
+
+    down = False
+
+    for i in range(len(L) - 1):
+        end = i
+
+        if start == - 1:
+            start = i
+
+        if L[i] == L[i + 1]:
+            equal_count += 1
+
+        elif L[i] < L[i + 1]:
+            if down:
+                down = False
+                # print(list([start, end]))
+                ranges.append(end - abs(start) + equal_count + 1)
+                equal_count = 0
+                # print(end - abs(start) + 1)
+                start = i
+
+        elif L[i] > L[i + 1]:
+            down = True
+
+    # print(list([start, end]))
+    ranges.append(end - abs(start) + 2)
+    # print(end - abs(start) + 2)
+
+    return max(ranges)
+
+# print(maxunimod([7, 2, 3, 0, 5, 4, 6, 5, 5, 9, 5, 1, 0, 5, 7, 8, 1, 7, 8, 3, 4, 8, 1, 4, 3, 3, 1, 9, 0, 0]))
