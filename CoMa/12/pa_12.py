@@ -19,6 +19,7 @@ def maxunimod(L):
             equal_count += 1
             count += 1
             if (i == 1) or (i == len(L) - 1) and not edge:
+                equal_count -= 2
                 edge = True
                 count += 1
 
