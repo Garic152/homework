@@ -76,18 +76,19 @@ def maxunimod(L):
                 # print("BIGGER")
                 down = False
                 # print(list([start, end]))
-                ranges.append(end - abs(start) + equal_count + 1)
-                # print("Appending ", end - abs(start) + equal_count + 1)
+                # print("Equal Count:", equal_count)
+                ranges.append(end - start + 1)
+                # print("Appending ", end - start + 1)
+                start = i - equal_count
                 equal_count = 0
-                start = i
 
         elif L[i] > L[i + 1]:
             down = True
 
     # print(list([start, end + 1]))
-    ranges.append(end - abs(start) + 2)
-    # print(end - abs(start) + 2)
+    ranges.append(end - start + 2)
+    # print(end - start + 2)
 
     return max(ranges)
 
-# print(maxunimod([1, 1, 9, 9, 0, 5, 2, 7, 2, 9]))
+# print(maxunimod([7, 2, 3, 0, 5, 4, 6, 5, 5, 9, 5, 1, 0, 5, 7, 8, 1, 7, 8, 3, 4, 8, 1, 4, 3, 3, 1, 9, 0, 0]))
