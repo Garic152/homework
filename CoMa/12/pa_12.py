@@ -1,97 +1,56 @@
 '''
 Returns the maximum length of a unimodular sequence for a given int-list L of length n ≥ 1.  
 '''
-
-def maxunimod_old(L):
+def maxunimod(L):
     '''
     Returns the maximum length of a unimodular sequence for a given int-list L of length n ≥ 1.  
     '''
-    down = False
-    edge = False
-
-    length = 0
-    count = 0
-    equal_count = 0
-
-    for i in range(1, len(L)):
-        # just increase count if number is same and check for edge cases
-        if L[i] == L[i - 1]:
-            equal_count += 1
-            count += 1
-
-        # check if number goes up
-        elif L[i] > L[i - 1]:
-            if i == 1 or i == len(L) - 1:
-                count += 1
-            
-            # if number went down previously, start new cycle
-            if down:
-                down = False
-                if count > length:
-                    length = count
-                count = 0
-
-            # increase counter by 1
-            count += 1
-
-        # check if number goes down
-        elif L[i] < L[i - 1]:
-            if i == 1 or i == len(L) - 1:
-                count += 1
-
-            down = True
-            count += 1
-
-            if L[i - 1] > L[i - 2]:
-                count += equal_count
-                equal_count = 0
-
-        # account for decreasing numbers at the end of the array
-        if i == len(L) - 1:
-            if count > length:
-                length = count
-
-    return length
-
-def maxunimod(L):
     ranges = []
+
+    # define start range
     start = -1
     end = 0
+
+    # define equal count for later use
     equal_count = 0
 
+    # define down flag
     down = False
 
+    # if L <= 2, L must be unimodular
     if len(L) <= 2:
         return len(L)
 
     for i in range(len(L) - 1):
+        # update range to current element
         end = i
 
+        # set start range to 0 (maybe just delete it and define it as 0)
         if start == - 1:
             start = i
 
+        # increase the range when elements are the same
         if L[i] == L[i + 1]:
             if down:
+                # increase equal_count to accord for later starting point adjustment
                 equal_count += 1
 
+        # if next element is bigger, increase the range
         elif L[i] < L[i + 1]:
             if down:
-                # print("BIGGER")
+                # "function" was previously at a turning point
+                # save the length of the unimodular row and reset the starting point
                 down = False
-                # print(list([start, end]))
-                # print("Equal Count:", equal_count)
                 ranges.append(end - start + 1)
-                # print("Appending ", end - start + 1)
                 start = i - equal_count
                 equal_count = 0
 
+        # if next element is bigger, increase the range and set the down flag
         elif L[i] > L[i + 1]:
             down = True
 
-    # print(list([start, end + 1]))
+    # account for unimodlen = L
     ranges.append(end - start + 2)
-    # print(end - start + 2)
 
+    # return longest range
     return max(ranges)
-
-# print(maxunimod([7, 1, 0]))
