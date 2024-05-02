@@ -38,6 +38,10 @@ end
 function height(node::Node)::Int
   if node.left === nothing && node.right === nothing #ERROR HERE
     return 1
+  elseif node.left === nothing
+    return height(node.right) + 1
+  elseif node.right === nothing
+    return height(node.left) + 1
   end
 
   return max(height(node.left), height(node.right)) + 1
@@ -51,9 +55,11 @@ function tree2vec(node::Node)::Vector{Union{Int,Nothing}}
 
   max_nodes = 2^(height(node)) - 1
 
-  array = [node.key]
+  array = Vector{Union{Nothing,Int}}(undef, 1)
+  array[1] = node.key
 
-  queue = [node]
+  queue = Vector{Union{Nothing,Node}}(undef, 1)
+  queue[1] = node
 
   while length(array) < max_nodes
     current = popfirst!(queue)
@@ -64,20 +70,23 @@ function tree2vec(node::Node)::Vector{Union{Int,Nothing}}
 
       push!(queue, nothing)
       push!(queue, nothing)
+      break
     end
 
-    if node.left === nothing
+    if current.left === nothing
       push!(array, nothing)
+      push!(queue, nothing)
     else
-      push!(array, node.left.key)
-      push!(queue, node.left)
+      push!(array, current.left.key)
+      push!(queue, current.left)
     end
 
-    if node.right === nothing
+    if current.right === nothing
       push!(array, nothing)
+      push!(queue, nothing)
     else
-      push!(array, node.right.key)
-      push!(queue, node.left)
+      push!(array, current.right.key)
+      push!(queue, current.right)
     end
   end
 
