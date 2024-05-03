@@ -70,7 +70,7 @@ function tree2vec(node::Node)::Vector{Union{Int,Nothing}}
 
       push!(queue, nothing)
       push!(queue, nothing)
-      break
+      continue
     end
 
     if current.left === nothing
@@ -101,7 +101,8 @@ function vec2tree(vec::Vector{Union{Int,Nothing}})
 
   root = node(vec[1])
 
-  queue = [root]
+  queue = Vector{Union{Nothing,Node}}(undef, 1)
+  queue[1] = root
 
   i = 2
 
@@ -109,13 +110,16 @@ function vec2tree(vec::Vector{Union{Int,Nothing}})
     current = popfirst!(queue)
 
     if vec[i] === nothing
+      push!(queue, nothing)
     else
       current.left = node(vec[i])
       push!(queue, current.left)
     end
     i += 1
 
+
     if vec[i] === nothing
+      push!(queue, nothing)
     else
       current.right = node(vec[i])
       push!(queue, current.right)
@@ -138,3 +142,9 @@ println(height(z))
 
 u = node(4, z, nothing)
 println(tree2vec(u))
+
+
+x = node(22, node(10, node(8, node(24, nothing, nothing), nothing), nothing), node(17, node(7, node(19, nothing, nothing), node(16, nothing, nothing)), node(28, node(21, nothing, nothing), node(12, nothing, nothing))))
+
+z = tree2vec(x)
+println(vec2tree(z))
