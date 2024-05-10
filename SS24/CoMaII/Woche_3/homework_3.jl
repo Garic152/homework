@@ -2,7 +2,7 @@ mutable struct Heap{T<:Real}
   data::Vector{T}
   comparator::Function
 
-  function Heap(data::Vector{T}, comparator::Function)::Heap{T} where {T<:Real}
+  function Heap(data::Vector{T}; comparator::Function)::Heap{T} where {T<:Real}
     @assert hasmethod(comparator, Tuple{typeof(data[1]),typeof(data[1])})
     # @assert Base.return_types(Heap(data, comparator)) == Bool
     new{T}(data, comparator)
@@ -36,7 +36,7 @@ function heapify!(heap::Heap{T})::Heap{T} where {T<:Real}
   for i = 1:length(heap.data)
     j = i
 
-    while j > 1 && heap.data[Int(round(j / 2, RoundDown))] < heap.data[j]
+    while j > 1 && heap.comparator(heap.data[j], heap.data[Int(round(j / 2, RoundDown))])
       temp = heap.data[Int(round(j / 2, RoundDown))]
       heap.data[Int(round(j / 2, RoundDown))] = heap.data[j]
       heap.data[j] = temp
@@ -49,8 +49,9 @@ function heapify!(heap::Heap{T})::Heap{T} where {T<:Real}
 end
 
 
-function heap(data::Vector{T}, comparator::Function)::Heap{T} where {T<:Real}
-  heap = Heap(data, comparator)
+function heap(data::Vector{T}; comparator::Function)::Heap{T} where {T<:Real}
+  heap = Heap(data; comparator)
+  heap = heapify!(heap)
   @assert is__Heap(heap) "Heap is no heap!"
   return heap
 end
@@ -76,7 +77,7 @@ function heapSort!(heap::Heap{T})::Heap{T} where {T<:Real}
 end
 
 
-function heapSort!(data::Vector{T}, comparator::Function)::Vector{T} where {T<:Real}
+function heapSort!(data::Vector{T}; comparator::Function)::Vector{T} where {T<:Real}
   if length(data) == 0
     return []
   end
@@ -101,5 +102,5 @@ function maximum(heap::Heap{T})::T where {T<:Real}
     return nothing
   end
 
-  return pop!(heapSort!(heap))
+  return pop!(heapSort!(heap).data)
 end
