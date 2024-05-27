@@ -4,11 +4,13 @@ mutable struct Heap{T<:Real}
 
   function Heap(data::Vector{T}; comparator::Function)::Heap{T} where {T<:Real}
     @assert hasmethod(comparator, Tuple{typeof(data[1]),typeof(data[1])})
+    @assert Base.return_types(comparator, Tuple{typeof(data[1]),typeof(data[1])})[1] == Bool
     return new{T}(data, comparator)
   end
 
   function Heap(data::Vector{T})::Heap{T} where {T<:Real}
     @assert hasmethod((x, y) -> x >= y, Tuple{typeof(data[1]),typeof(data[1])})
+    @assert Base.return_types(comparator, Tuple{typeof(data[1]),typeof(data[1])})[1] == Bool
     return new{T}(data, (x, y) -> x >= y)
   end
 end
