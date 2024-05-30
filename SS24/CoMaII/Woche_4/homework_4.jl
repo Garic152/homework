@@ -1,3 +1,6 @@
+"""
+This file implements the basic functionality of a union find datastructure using dicts and a mutable node struct.
+"""
 mutable struct Node
   value::Int
   parent::Union{Node,Nothing}
@@ -5,6 +8,12 @@ end
 
 
 function union_find(partition::Vector{Tuple{Int,Vector{Int}}})::Dict{Int,Node}
+  """
+  Convert vector of nodes to union find dictionary.
+  """
+  # 1. First create a dict to save the union structure
+  # 2. Loop over the roots in the vector, create empty node and save it in dict
+  # 3. If child exists, link it to root and save it
   dict = Dict{Int,Node}()
   for (root, elements) in partition
     root_node = Node(root, nothing)
@@ -21,6 +30,10 @@ end
 
 
 function find_set(node::Node)::Node
+  """
+  Find root of given node (no argument modification).
+  """
+  # Visit parent until parent is empty and root found
   while node.parent !== nothing
     node = node.parent
   end
@@ -29,6 +42,11 @@ end
 
 
 function find_set!(node::Node)::Node
+  """
+  Find root of given node x and change parent of x to root (WITH argument modification).
+  """
+  # Visit parent until parent is empty and root found
+  # and then update the parent of the node to root
   root_node = node
 
   while root_node.parent !== nothing
@@ -42,6 +60,10 @@ end
 
 
 function union!(node1::Node, node2::Node)::Nothing
+  """
+  Combine two union find trees.
+  """
+  # first find the roots and then update parent if roots are not the same
   root1 = find_set!(node1)
   root2 = find_set!(node2)
 
@@ -53,6 +75,11 @@ end
 
 
 function add!(nodes::Dict{Int,Node}, value::Int)::Nothing
+  """
+  Add a new node to a union find tree.
+  """
+  # Check if node is already in tree
+  # Then add the entry to the dict
   @assert haskey(nodes, value) == false
   nodes[value] = Node(value, nothing)
   return nothing
