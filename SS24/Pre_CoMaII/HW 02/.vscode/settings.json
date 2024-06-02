@@ -1,0 +1,11 @@
+{
+    "sqltools.connections": [
+        {
+            "previewLimit": 50,
+            "driver": "DuckDB",
+            "database": "C:\\Users\\erict\\Desktop\\Uni\\SS24\\CA\\CA_Assignment2_LDA\\sql.sql",
+            "name": "Test"
+        }
+    ],
+    "sqltools.useNodeRuntime": true
+}
