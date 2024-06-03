@@ -31,10 +31,12 @@ void *queue_poll(queue_object *queue) {
     current = current->next;
   }
 
+  void *object = current->next->object;
+
   free(current->next);
   current->next = NULL;
 
-  return queue->next->object;
+  return object;
 }
 
 queue_object *new_queue() {
